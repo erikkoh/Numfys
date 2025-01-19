@@ -16,24 +16,22 @@ function Grid_Bonds(L::Int)
     return bonds
 end
 
-square_grid = Grid_Bonds(10)
-
-
-write_to_JSON(square_grid, "Square_grid")
-
 
 function Triangular_bonds(L::Int)
     bonds = []
-    for i in 1:L*(L+1)/2
+    row_start_func = x -> (x*(x-1)) ÷ 2 + 1
+    artimic_sum = x -> (x*(x+1)) / 2
+    for i in 1:Int(artimic_sum(L))
         row_num = floor(Int, (sqrt(8 * (i - 1) + 1) - 1) / 2) + 1
-        row_start = (row_num * (row_num - 1)) ÷ 2 + 1
+        row_start = Int(row_start_func(row_num))
         row_length = row_num
-        collum_pos = i - row_start + 1
-
-        right_neighbour = if collum_pos < row_length i + 1 else 0 end
-        down_left_neighbour = if row_num < L i + row_length else 0 end
-        down_right_neighbour = if row_num < L i + row_length + 1 else 0 end
-
+        row_pos = i - row_start + 1
+        
+        
+        right_neighbour = if row_pos < row_length i + 1 else row_start end
+        down_left_neighbour = if row_num < L i + row_length else Int(artimic_sum(row_pos)) end
+        down_right_neighbour = if row_num < L i + row_length + 1 else Int(row_start_func(L-row_pos + 1)) end
+        
         neighbor = [right_neighbour, down_left_neighbour, down_right_neighbour]
         
         push!(bonds, neighbor)
@@ -41,6 +39,9 @@ function Triangular_bonds(L::Int)
     return bonds
 end
 
-triangular_grid = Triangular_bonds(10)
 
+square_grid = Grid_Bonds(10)
+triangular_grid = Triangular_bonds(3)
+
+write_to_JSON(square_grid, "Square_grid")
 write_to_JSON(triangular_grid, "Triangular_grid")

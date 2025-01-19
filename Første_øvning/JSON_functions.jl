@@ -8,5 +8,5 @@ function write_to_JSON(bond_list, name)
     open(file_path, "w") do file
         write(file, json_data)
     end
-    print("Written to file path $file_path")
+    println("Written to file path $file_path")
 end
