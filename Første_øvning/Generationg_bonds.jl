@@ -110,5 +110,5 @@ honeycomb_grid = Honey_comb_grid(10)
 
 write_to_JSON(square_grid, "Square_grid", length(square_grid)*2)
 write_to_JSON(triangular_grid, "Triangular_grid", length(triangular_grid)*3)
-write_to_JSON(honeycomb_grid, "Honeycomb_grid", length(honeycomb_grid)*3)
+write_to_JSON(honeycomb_grid, "Honeycomb_grid", Int(length(honeycomb_grid)*3/2))
 
