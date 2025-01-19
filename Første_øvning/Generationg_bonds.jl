@@ -40,8 +40,12 @@ function Triangular_bonds(L::Int)
 end
 
 
+function Honey_comb_grid(L::Int)
+
+end
+
 square_grid = Grid_Bonds(10)
 triangular_grid = Triangular_bonds(3)
 
-write_to_JSON(square_grid, "Square_grid")
-write_to_JSON(triangular_grid, "Triangular_grid")
+write_to_JSON(square_grid, "Square_grid", length(square_grid)*2)
+write_to_JSON(triangular_grid, "Triangular_grid", length(triangular_grid)*3)
