@@ -56,11 +56,10 @@ end
 
 
 #Grid:
-# Honeycomb:
 #    x---x
-#   / \ / \
-#  x---x---x
-#   \ / \ /
+#   /     \
+#  x       x
+#   \     /
 #    x---x
 function Honey_comb_grid(L::Int)
     bonds = []
