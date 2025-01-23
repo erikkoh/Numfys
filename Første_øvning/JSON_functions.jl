@@ -1,5 +1,9 @@
 using JSON
 
+module JSON_functions
+
+export write_to_JSON, find_folder
+
 function write_to_JSON(bond_list,name, number_of_bonds)
     data_dic = Dict("Number of bonds" => number_of_bonds, "Bonds" => bond_list)
     json_data = JSON.json(data_dic)
@@ -21,4 +25,5 @@ function find_folder(folder_name::String)
         end
     end
     error("Folder not found")
+end
 end

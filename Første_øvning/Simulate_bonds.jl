@@ -2,6 +2,8 @@ import JSON
 import Random
 include("JSON_functions.jl")
 
+using  .JSON_functions: find_folder
+
 Random.seed!(144)
 
 JSON_info = JSON.parsefile(find_folder("JSON_files") * "Square_grid.json")
