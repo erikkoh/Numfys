@@ -1,9 +1,10 @@
 import JSON
 import Random
+include("JSON_functions.jl")
 
 Random.seed!(144)
 
-JSON_info = JSON.parsefile("./Første_øvning/JSON_files/Square_grid.json")
+JSON_info = JSON.parsefile(find_folder("JSON_files") * "Square_grid.json")
 
 bonds = JSON_info["Bonds"]
 
@@ -93,7 +94,3 @@ function p_images(p_list)
     end
     return p_dic
 end
-p_list = [0.1, 0.2, 0.3, 0.4]
-p_dic = p_images(p_list)
-println(p_dic[0.1]["largest_cluster_list"])
-
