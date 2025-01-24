@@ -1,6 +1,5 @@
-using JSON
-
 module JSONFunctions
+using JSON
 
 
 export find_folder, write_to_JSON
