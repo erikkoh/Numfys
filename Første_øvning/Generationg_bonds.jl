@@ -1,5 +1,5 @@
 include("JSON_functions.jl")
-
+using .JSONFunctions: write_to_JSON 
 #Grid:
 # x---x---x
 # |   |   |
@@ -12,10 +12,10 @@ function Grid_Bonds(L::Int)
     for i in 1:L^2
         row_pos = (i-1)%L + 1
         collum_pos = div(i-1,L) + 1
-        row_neighbour = ((row_pos) % L + 1) + (collum_pos-1)*L
-        collum_neighbour = (row_pos) + (collum_pos % L  )*L
-        neigbours = [row_neighbour, collum_neighbour ]
-        push!(bonds,neigbours)
+        row_neighbour = [i,( (row_pos) % L + 1) + (collum_pos-1)*L]
+        collum_neighbour = [i, (row_pos) + (collum_pos % L  )*L]
+        push!(bonds,row_neighbour)
+        push!(bonds,collum_neighbour)
     end
     return bonds
 end
@@ -66,18 +66,17 @@ function Honey_comb_grid(L::Int)
     function double_neighbour(i::Int, L::Int)
         row_pos = (i-1)%L + 1
         collum_pos = div(i-1,L) + 1
-        right_neighbour = ((row_pos) % L + 1) + (collum_pos-1)*L
-        down_neighbour = if collum_pos < L i+L else row_pos end
-        neighbour = [right_neighbour, down_neighbour]
-        return neighbour
+        right_neighbour = [i,((row_pos) % L + 1) + (collum_pos-1)*L]
+        down_neighbour = [i, if collum_pos < L i+L else row_pos end]
+        neigbours = [right_neighbour,down_neighbour]
+        return neigbours
     end
     
     function single_neighbour(i::Int, L::Int)
         row_pos = (i-1)%L + 1
         collum_pos = div(i-1,L) + 1
-        down_neighbour = if collum_pos < L i+L else row_pos end
-        neighbour = [down_neighbour]
-        return neighbour
+        down_neighbour = [i, if collum_pos < L i+L else row_pos end]
+        return down_neighbour
     end
     for i in 1:L^2
         row_pos = (i-1)%L + 1
@@ -103,11 +102,11 @@ function Honey_comb_grid(L::Int)
     return bonds
 end
 
-square_grid = Grid_Bonds(10)
+square_grid = Grid_Bonds(100)
 triangular_grid = Triangular_bonds(10)
-honeycomb_grid = Honey_comb_grid(10)
+honeycomb_grid = Honey_comb_grid(100)
 
-write_to_JSON(square_grid, "Square_grid", length(square_grid)*2)
-write_to_JSON(triangular_grid, "Triangular_grid", length(triangular_grid)*3)
+write_to_JSON(square_grid, "Square_grid", length(square_grid))
+write_to_JSON(triangular_grid, "Triangular_grid", length(triangular_grid))
 write_to_JSON(honeycomb_grid, "Honeycomb_grid", Int(length(honeycomb_grid)*3/2))
 
