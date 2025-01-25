@@ -9,11 +9,12 @@ gr()
 p_list = [0.25, 0.4, 0.45, 0.5]
 function plot_images_points(p_values)
     p_dic = p_images(p_values)
-    L = Int((length(p_dic[p_values[end]]["sites"]))^(1/2))
+    L = Int(floor((length(p_dic[p_values[end]]["sites"]))^(1/2)))
     x_cord = [mod1(i, L) for i in 1:L^2]
     y_cord = [div(i-1, L) + 1 for i in 1:L^2]
 
     for i in p_values
+        println("Plotting for p = $i")
         largest_cluster_list = p_dic[i]["largest_cluster_list"]
         largest_cluster_y = [div(i-1, L) + 1 for i in (largest_cluster_list)]
         largest_cluster_x = [mod1(i, L) for i in largest_cluster_list]
@@ -26,9 +27,10 @@ end
 
 function plot_images(p_values)
     p_dic = p_images(p_values)
-    L = Int((length(p_dic[p_values[end]]["sites"]))^(1/2))
+    L = Int(floor((length(p_dic[p_values[end]]["sites"]))^(1/2)))
     
     for p in p_values
+        println("Plotting for p = $p")
         sites = p_dic[p]["sites"]
         largest_cluster_list = p_dic[p]["largest_cluster_list"]
         
