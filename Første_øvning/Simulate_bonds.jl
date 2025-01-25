@@ -12,17 +12,21 @@ JSON_info = JSON.parsefile(find_folder("JSON_files") * "Square_grid.json")
 bonds = JSON_info["Bonds"]
 
 num_bonds =JSON_info["Number of bonds"]
+num_nodes = bonds[end][1]
 
 function swaping_bonds(bonds_list)
-    for i in 1:(eachindex(bonds_list)-1)
+    println("Swaping bonds")
+    for i in ProgressBar(1:(length(bonds_list)-1))
         candidate_number = rand(i+1:num_bonds)
         temp = bonds_list[i]
         bonds_list[i] = bonds_list[candidate_number]
         bonds_list[candidate_number] = temp
     end
+    println("Done!")
     return bonds_list
 end
 
+bonds = swaping_bonds(bonds)
 
 function has_duplicates(list)
     seen = Set()
@@ -51,8 +55,8 @@ end
 function simulate_bonds(p)
     max_iter = 2_000_000
     pgb = ProgressBar(total=max_iter)
-    N = bonds[end][1]
-    sites = [-1 for i in 1:(N+1)]
+    N = num_nodes
+    sites = [-1 for i in 1:(N)]
     largest_cluster = Dict("index" => 1, "size" => 1)
     number_of_activated_bonds = 0
     p_0 = [0.0]
@@ -65,7 +69,6 @@ function simulate_bonds(p)
     println("Start loop")
     while p_0[end] <= p && steps < max_iter && largest_cluster["size"] < N
         # lowest_value = minimum(sites) this is way to ineficent for 1000^2 this would take a stupid amount of time
-        
         selected_bond = rand(1:num_bonds)
         node1, node2 = bonds[selected_bond]
         root1 = find_root_node(node1,sites)
