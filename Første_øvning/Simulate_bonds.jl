@@ -84,9 +84,11 @@ function simulate_bonds(n=num_bonds, bonds_list=bonds)
             end
             if sites[new_root] < largest_cluster["size"]
                 largest_cluster = Dict("index" => new_root, "size" => sites[new_root])
+            else
+                s_step = (avarage_s - (N * p_inf[end])^2) / (N * (1 - p_inf[end]))
+                s_step = isfinite(s_step) ? s_step : 0.0  # Ensure s_step is finite
             end
             avarage_s += sites[new_root]^2
-            s_step = (avarage_s-(N*p_inf[end])^2)/(N*(1-p_inf[end])) 
         end
         push!(s,s_step)
         push!(p_0, number_of_activated_bonds/num_bonds)
@@ -123,16 +125,19 @@ function avarage_values(iterations::Int64, bond_list)
     susept_list = []
     s_list = []
     p_list = []
+    p_inf_2_list = []
     for i in ProgressBar(1:iterations)
         bond_list = swaping_bonds(bond_list)
         result = simulate_bonds(num_bonds, bond_list)
         p = result[4]
         p_inf = result[5]
+        p_inf_2 = result[6]
         susept = result[7]
         s = result[8]
         println("length of p_inf: ", length(p_inf))
         push!(p_list,p)
         push!(p_inf_list,p_inf)
+        push!(p_inf_2_list,p_inf_2)
         push!(susept_list,susept)
         push!(s_list,s)
     end
@@ -141,6 +146,7 @@ function avarage_values(iterations::Int64, bond_list)
     susept_avarage = [sum([p[i] for p in susept_list ])/length(susept_list) for i in eachindex(susept_list[1])]
     s_avarage = [sum([p[i] for p in s_list ])/length(s_list) for i in eachindex(s_list[1])]
     p_avarage = [sum([p[i] for p in p_list])/length(p_list) for i in eachindex(p_list[1])]
-    values_dic = Dict("p_inf" => p_inf_avarage, "susept" => susept_avarage, "s" => s_avarage, "p" => p_avarage)
+    p_inf_2_avarage = [sum([p[i] for p in p_inf_2_list ])/length(p_inf_2_list) for i in eachindex(p_inf_2_list[1])]
+    values_dic = Dict("p_inf" => p_inf_avarage,"p_inf_2" => p_inf_2_avarage, "susept" => susept_avarage, "s" => s_avarage, "p" => p_avarage)
     write_to_JSON(values_dic,"avarage_values_$num_bonds")
 end
