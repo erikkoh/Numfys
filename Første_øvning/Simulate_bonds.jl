@@ -52,7 +52,7 @@ function find_root_node(j, sites)
     end
 end
 
-function simulate_bonds(p,bonds_list)
+function simulate_bonds(n = num_bonds, bonds_list=bonds)
     max_iter = 2_000_000
     pgb = ProgressBar(total=max_iter)
     N = num_nodes
@@ -65,18 +65,17 @@ function simulate_bonds(p,bonds_list)
     susept = [N*(p_inf_2[1]- p_inf[1]^2)^(1/2)]
     avarage_s = N
     s = [0.0]
+    s_step = (avarage_s-(N*p_inf[end])^2)/(N*(1-p_inf[end]))
     steps = 0
     println("Start loop")
-    while p_0[end] <= p && steps < max_iter && largest_cluster["size"] < N
-        # lowest_value = minimum(sites) this is way to ineficent for 1000^2 this would take a stupid amount of time
-        selected_bond = rand(1:num_bonds)
-        node1, node2 = bonds_list[selected_bond]
+    for i in ProgressBar(1:n)
+        node1, node2 = bonds_list[i]
         root1 = find_root_node(node1,sites)
         root2 = find_root_node(node2,sites)
+        number_of_activated_bonds += 1
         if root1 != root2
             avarage_s = avarage_s -sites[root1]^2 - sites[root2]^2
             update(pgb)
-            number_of_activated_bonds += 1
             if sites[root1] < sites[root2]
                 sites[root1] += sites[root2]
                 sites[root2] = root1
@@ -91,13 +90,12 @@ function simulate_bonds(p,bonds_list)
             end
             avarage_s += sites[new_root]^2
             s_step = (avarage_s-(N*p_inf[end])^2)/(N*(1-p_inf[end])) 
-            push!(s,s_step)
-            push!(p_0, number_of_activated_bonds/num_bonds)
-            push!(p_inf,-largest_cluster["size"]/N)
-            push!(p_inf_2,(largest_cluster["size"]/N)^2)
-            push!(susept,N*(sum(p_inf_2)/length(p_inf_2) - (sum(p_inf)/length(p_inf))^2)^(1/2))
-        else
         end
+        push!(s,s_step)
+        push!(p_0, number_of_activated_bonds/num_bonds)
+        push!(p_inf,-largest_cluster["size"]/N)
+        push!(p_inf_2,(largest_cluster["size"]/N)^2)
+        push!(susept,N*(sum(p_inf_2)/length(p_inf_2) - (sum(p_inf)/length(p_inf))^2)^(1/2))
         steps += 1
     end
     println("Number of steps: ", steps)
@@ -105,6 +103,7 @@ function simulate_bonds(p,bonds_list)
     println("Number of bonds: ", num_bonds)
     println("Number of activated bonds: ", number_of_activated_bonds)
     println("Susceptiblitly: ", susept[end])
+    println(length(s) == length(p_0)==length(p_inf)==length(p_inf_2)==length(susept))
     println("Started looking for largest cluster:")
     largest_cluster_list = [i for i in ProgressBar(eachindex(sites)) if find_root_node(i,sites) == largest_cluster["index"]]
     println("Done!")
@@ -113,21 +112,14 @@ end
 
 function p_images(p_list)
     p_dic = Dict{Float64,Any}()
-    for i in p_list
-        p = i
-        largest_cluster, sites, largest_cluster_list, p_0 = simulate_bonds(p,bonds)
+    for p in p_list
+        i = Int(floor(p*num_bonds))
+        largest_cluster, sites, largest_cluster_list, p_0 = simulate_bonds(i, bonds )
         p_dic[p] = Dict("largest_cluster" => largest_cluster, "sites" => sites, "largest_cluster_list" => largest_cluster_list, "p_0" => p_0[end])
     end
     return p_dic
 end
 
-
-function pad_arrays(arrays, pad_value)
-    max_length = maximum(length.(arrays))
-    padded_arrays = [vcat(arr, fill(pad_value, max_length - length(arr))) for arr in arrays]
-    return padded_arrays
-end
-    
 
 function avarage_values(iterations::Int64, bonds_list)
     p_inf_list = []
@@ -160,8 +152,6 @@ function avarage_values(iterations::Int64, bonds_list)
     susept_avarage = [sum([p[i] for p in susept_list if !isnan(p[i])])/length(susept_list) for i in eachindex(susept_list[1])]
     s_avarage = [sum([p[i] for p in s_list if !isnan(p[i])])/length(s_list) for i in eachindex(s_list[1])]
     p_avarage = [sum([p[i] for p in p_list if !isnan(p[i])])/length(p_list) for i in eachindex(p_list[1])]
-    values_dic = Dict("p_inf" => p_inf_avarage, "susept" => susept_avarage, "s" => s_avarage)
+    values_dic = Dict("p_inf" => p_inf_avarage, "susept" => susept_avarage, "s" => s_avarage, "p" => p_avarage)
     write_to_JSON(values_dic,"avarage_values_$num_bonds")
 end
-
-avarage_values(2,bonds)
