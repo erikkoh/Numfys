@@ -17,7 +17,7 @@ function Grid_Bonds(L::Int)
         push!(bonds,row_neighbour)
         push!(bonds,collum_neighbour)
     end
-    return bonds
+    return Dict("Number of bonds" => length(bonds), "Bonds" => bonds)
 end
 
 
@@ -47,7 +47,7 @@ function Triangular_bonds(L::Int)
         
         push!(bonds, neighbor)
     end
-    return bonds
+    return Dict("Number of bonds" => length(bonds), "Bonds" => bonds)
 end
 
 
@@ -99,14 +99,14 @@ function Honey_comb_grid(L::Int)
         push!(bonds,neigbours)
 
     end
-    return bonds
+    return Dict("Number of bonds" => length(bonds), "Bonds" => bonds)
 end
 
-square_grid = Grid_Bonds(100)
-triangular_grid = Triangular_bonds(10)
-honeycomb_grid = Honey_comb_grid(100)
+square_grid = Grid_Bonds(1000)
+triangular_grid = Triangular_bonds(1000)
+honeycomb_grid = Honey_comb_grid(1000)
 
-write_to_JSON(square_grid, "Square_grid", length(square_grid))
-write_to_JSON(triangular_grid, "Triangular_grid", length(triangular_grid))
-write_to_JSON(honeycomb_grid, "Honeycomb_grid", Int(length(honeycomb_grid)*3/2))
+write_to_JSON(square_grid, "Square_grid")
+write_to_JSON(triangular_grid, "Triangular_grid")
+write_to_JSON(honeycomb_grid, "Honeycomb_grid")
 

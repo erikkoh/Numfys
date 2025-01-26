@@ -4,9 +4,8 @@ using JSON
 
 export find_folder, write_to_JSON
 
-function write_to_JSON(bond_list,name, number_of_bonds)
-    data_dic = Dict("Number of bonds" => number_of_bonds, "Bonds" => bond_list)
-    json_data = JSON.json(data_dic)
+function write_to_JSON(input_data,name)
+    json_data = JSON.json(input_data)
     
     file_path = find_folder("JSON_files")*"/"* name * ".json"
 
