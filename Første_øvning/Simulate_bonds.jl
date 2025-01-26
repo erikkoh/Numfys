@@ -52,9 +52,7 @@ function find_root_node(j, sites)
     end
 end
 
-function simulate_bonds(n = num_bonds, bonds_list=bonds)
-    max_iter = 2_000_000
-    pgb = ProgressBar(total=max_iter)
+function simulate_bonds(n=num_bonds, bonds_list=bonds)
     N = num_nodes
     sites = [-1 for i in 1:(N)]
     largest_cluster = Dict("index" => 1, "size" => 1)
@@ -75,7 +73,6 @@ function simulate_bonds(n = num_bonds, bonds_list=bonds)
         number_of_activated_bonds += 1
         if root1 != root2
             avarage_s = avarage_s -sites[root1]^2 - sites[root2]^2
-            update(pgb)
             if sites[root1] < sites[root2]
                 sites[root1] += sites[root2]
                 sites[root2] = root1
@@ -121,14 +118,14 @@ function p_images(p_list)
 end
 
 
-function avarage_values(iterations::Int64, bonds_list)
+function avarage_values(iterations::Int64, bond_list)
     p_inf_list = []
     susept_list = []
     s_list = []
     p_list = []
     for i in ProgressBar(1:iterations)
-        bonds_list = swaping_bonds(bonds_list)
-        result = simulate_bonds(1.0,bonds_list)
+        bond_list = swaping_bonds(bond_list)
+        result = simulate_bonds(num_bonds, bond_list)
         p = result[4]
         p_inf = result[5]
         susept = result[7]
@@ -139,19 +136,11 @@ function avarage_values(iterations::Int64, bonds_list)
         push!(susept_list,susept)
         push!(s_list,s)
     end
-    println("Paddinf p_inf")
-    p_inf_list = pad_arrays(p_inf_list, NaN)
-    println("Paddinf susept")
-    susept_list = pad_arrays(susept_list, NaN)
-    println("Paddinf s")
-    s_list = pad_arrays(s_list, NaN)
-    println("Paddinf p")
-    p_list = pad_arrays(p_list, NaN)
 
-    p_inf_avarage = [sum([p[i] for p in p_inf_list if !isnan(p[i])])/length(p_inf_list) for i in eachindex(p_inf_list[1])]
-    susept_avarage = [sum([p[i] for p in susept_list if !isnan(p[i])])/length(susept_list) for i in eachindex(susept_list[1])]
-    s_avarage = [sum([p[i] for p in s_list if !isnan(p[i])])/length(s_list) for i in eachindex(s_list[1])]
-    p_avarage = [sum([p[i] for p in p_list if !isnan(p[i])])/length(p_list) for i in eachindex(p_list[1])]
+    p_inf_avarage = [sum([p[i] for p in p_inf_list ])/length(p_inf_list) for i in eachindex(p_inf_list[1])]
+    susept_avarage = [sum([p[i] for p in susept_list ])/length(susept_list) for i in eachindex(susept_list[1])]
+    s_avarage = [sum([p[i] for p in s_list ])/length(s_list) for i in eachindex(s_list[1])]
+    p_avarage = [sum([p[i] for p in p_list])/length(p_list) for i in eachindex(p_list[1])]
     values_dic = Dict("p_inf" => p_inf_avarage, "susept" => susept_avarage, "s" => s_avarage, "p" => p_avarage)
     write_to_JSON(values_dic,"avarage_values_$num_bonds")
 end
