@@ -161,7 +161,7 @@ function avarage_values(iterations::Int64, bonds_list)
     s_avarage = [sum([p[i] for p in s_list if !isnan(p[i])])/length(s_list) for i in eachindex(s_list[1])]
     p_avarage = [sum([p[i] for p in p_list if !isnan(p[i])])/length(p_list) for i in eachindex(p_list[1])]
     values_dic = Dict("p_inf" => p_inf_avarage, "susept" => susept_avarage, "s" => s_avarage)
-    write_to_JSON(values_dic,"avarage_values")
+    write_to_JSON(values_dic,"avarage_values_$num_bonds")
 end
 
 avarage_values(2,bonds)
