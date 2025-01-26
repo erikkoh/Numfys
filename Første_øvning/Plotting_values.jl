@@ -3,7 +3,7 @@ using Plots
 include("Simulate_bonds.jl")
 
 
-simulation = simulate_bonds(1.0)
+simulation = simulate_bonds()
 
 p_0 = simulation[4]
 p_inf = simulation[5]
