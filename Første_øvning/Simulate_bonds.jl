@@ -3,7 +3,7 @@ import Random
 using ProgressBars
 include("JSON_functions.jl")
 
-using  .JSONFunctions: find_folder
+using  .JSONFunctions: find_folder, write_to_JSON
 
 Random.seed!(144)
 
@@ -52,7 +52,7 @@ function find_root_node(j, sites)
     end
 end
 
-function simulate_bonds(p)
+function simulate_bonds(p,bonds_list)
     max_iter = 2_000_000
     pgb = ProgressBar(total=max_iter)
     N = num_nodes
@@ -70,7 +70,7 @@ function simulate_bonds(p)
     while p_0[end] <= p && steps < max_iter && largest_cluster["size"] < N
         # lowest_value = minimum(sites) this is way to ineficent for 1000^2 this would take a stupid amount of time
         selected_bond = rand(1:num_bonds)
-        node1, node2 = bonds[selected_bond]
+        node1, node2 = bonds_list[selected_bond]
         root1 = find_root_node(node1,sites)
         root2 = find_root_node(node2,sites)
         if root1 != root2
@@ -115,8 +115,53 @@ function p_images(p_list)
     p_dic = Dict{Float64,Any}()
     for i in p_list
         p = i
-        largest_cluster, sites, largest_cluster_list, p_0 = simulate_bonds(p)
+        largest_cluster, sites, largest_cluster_list, p_0 = simulate_bonds(p,bonds)
         p_dic[p] = Dict("largest_cluster" => largest_cluster, "sites" => sites, "largest_cluster_list" => largest_cluster_list, "p_0" => p_0[end])
     end
     return p_dic
 end
+
+
+function pad_arrays(arrays, pad_value)
+    max_length = maximum(length.(arrays))
+    padded_arrays = [vcat(arr, fill(pad_value, max_length - length(arr))) for arr in arrays]
+    return padded_arrays
+end
+    
+
+function avarage_values(iterations::Int64, bonds_list)
+    p_inf_list = []
+    susept_list = []
+    s_list = []
+    p_list = []
+    for i in ProgressBar(1:iterations)
+        bonds_list = swaping_bonds(bonds_list)
+        result = simulate_bonds(1.0,bonds_list)
+        p = result[4]
+        p_inf = result[5]
+        susept = result[7]
+        s = result[8]
+        println("length of p_inf: ", length(p_inf))
+        push!(p_list,p)
+        push!(p_inf_list,p_inf)
+        push!(susept_list,susept)
+        push!(s_list,s)
+    end
+    println("Paddinf p_inf")
+    p_inf_list = pad_arrays(p_inf_list, NaN)
+    println("Paddinf susept")
+    susept_list = pad_arrays(susept_list, NaN)
+    println("Paddinf s")
+    s_list = pad_arrays(s_list, NaN)
+    println("Paddinf p")
+    p_list = pad_arrays(p_list, NaN)
+
+    p_inf_avarage = [sum([p[i] for p in p_inf_list if !isnan(p[i])])/length(p_inf_list) for i in eachindex(p_inf_list[1])]
+    susept_avarage = [sum([p[i] for p in susept_list if !isnan(p[i])])/length(susept_list) for i in eachindex(susept_list[1])]
+    s_avarage = [sum([p[i] for p in s_list if !isnan(p[i])])/length(s_list) for i in eachindex(s_list[1])]
+    p_avarage = [sum([p[i] for p in p_list if !isnan(p[i])])/length(p_list) for i in eachindex(p_list[1])]
+    values_dic = Dict("p_inf" => p_inf_avarage, "susept" => susept_avarage, "s" => s_avarage)
+    write_to_JSON(values_dic,"avarage_values")
+end
+
+avarage_values(2,bonds)
