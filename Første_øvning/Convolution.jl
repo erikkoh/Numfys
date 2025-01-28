@@ -19,18 +19,19 @@ end
 
 
 function calculating_binomial_coefficients_striling(number_of_bonds::Int64)
-stirlings_approximation = x -> x * log10(x) - x + 0.5 * log10(2 * π * x)
-    n_log = stirlings_approximation(number_of_bonds)
-    coefficient = []
-    println("Generating binomial coefficients:")
-    for i  in ProgressBar(0:number_of_bonds-1)
-        n_i_log = stirlings_approximation(number_of_bonds-i)
-        i_log = stirlings_approximation(i)
-        push!(coefficient,big(10^(n_log - n_i_log - i_log)))
-    end
-    coefficient[end] = 1.0
-    println("Done!")
-    return coefficient
+    stirlings_approximation = x -> x * log(x) - x + 0.5 * log(2 * π * x)
+        n_log = stirlings_approximation(number_of_bonds)
+        coefficient = []
+        println("Generating binomial coefficients:")
+        for i  in ProgressBar(0:number_of_bonds-1)
+            n_i_log = stirlings_approximation(number_of_bonds-i)
+            i_log = stirlings_approximation(i)
+            push!(coefficient,BigFloat((n_log - n_i_log - i_log)))
+        end
+        coefficient[end] = 1.0
+        coefficient = [BigFloat(exp(i)) for i in coefficient]
+        println("Done!")
+        return coefficient
 end
 
 function binomial_coefficient(n::Int, k::Int)
@@ -96,7 +97,7 @@ function convelute_data(N::Int)
     suseptibility = JSON_info["susept"]
     p_list = JSON_info["p"]
     println("Started convolution for p_inf")
-    binomial_coefficients = calculating_binomial_coefficients_log_2(length(p_inf))
+    binomial_coefficients = calculating_binomial_coefficients_striling(length(p_inf))
     println("Started convolution for p_inf")
     p_inf_convolution = convolution_for_property(p_inf, binomial_coefficients)
     println("Started convolution for s")
