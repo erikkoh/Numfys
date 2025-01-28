@@ -102,11 +102,4 @@ function Honey_comb_grid(L::Int)
     return Dict("Number of bonds" => length(bonds), "Bonds" => bonds)
 end
 
-square_grid = Grid_Bonds(1000)
-triangular_grid = Triangular_bonds(1000)
-honeycomb_grid = Honey_comb_grid(1000)
-
-write_to_JSON(square_grid, "Square_grid")
-write_to_JSON(triangular_grid, "Triangular_grid")
-write_to_JSON(honeycomb_grid, "Honeycomb_grid")
 
