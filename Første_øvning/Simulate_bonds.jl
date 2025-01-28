@@ -7,12 +7,6 @@ using  .JSONFunctions: find_folder, write_to_JSON
 
 Random.seed!(144)
 
-JSON_info = JSON.parsefile(find_folder("JSON_files") * "Square_grid.json")
-
-bonds = JSON_info["Bonds"]
-
-num_bonds =JSON_info["Number of bonds"]
-num_nodes = bonds[end][1]
 
 function swaping_bonds(bonds_list)
     println("Swaping bonds")
@@ -26,7 +20,6 @@ function swaping_bonds(bonds_list)
     return bonds_list
 end
 
-bonds = swaping_bonds(bonds)
 
 function has_duplicates(list)
     seen = Set()
@@ -52,7 +45,11 @@ function find_root_node(j, sites)
     end
 end
 
-function simulate_bonds(n=num_bonds, bonds_list=bonds)
+function simulate_bonds(n::Int)
+    JSON_info = JSON.parsefile(find_folder("JSON_files") * "Square_grid_bonds_$n.json")
+    bonds = JSON_info["Bonds"]
+    num_bonds =JSON_info["Number of bonds"]
+    num_nodes = bonds[end][1]
     N = num_nodes
     sites = [-1 for i in 1:(N)]
     largest_cluster = Dict("index" => 1, "size" => 1)
@@ -66,8 +63,8 @@ function simulate_bonds(n=num_bonds, bonds_list=bonds)
     s_step = (avarage_s-(N*p_inf[end])^2)/(N*(1-p_inf[end]))
     steps = 0
     println("Start loop")
-    for i in ProgressBar(1:n)
-        node1, node2 = bonds_list[i]
+    for i in ProgressBar(1:num_bonds)
+        node1, node2 = bonds[i]
         root1 = find_root_node(node1,sites)
         root2 = find_root_node(node2,sites)
         number_of_activated_bonds += 1

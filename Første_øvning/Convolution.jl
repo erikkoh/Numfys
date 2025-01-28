@@ -97,8 +97,9 @@ function convelute_data(N::Int)
     p_list = JSON_info["p"]
     println("Started convolution for p_inf")
     binomial_coefficients = calculating_binomial_coefficients_log_2(length(p_inf))
-    println("Started convolution for s")
+    println("Started convolution for p_inf")
     p_inf_convolution = convolution_for_property(p_inf, binomial_coefficients)
+    println("Started convolution for s")
     s_convolution = convolution_for_property(s, binomial_coefficients)
-    return Dic("p_inf"=> p_inf_convolution, "s"=> s_convolution)
+    return Dict("p_inf"=> p_inf_convolution, "s"=> s_convolution)
 end
