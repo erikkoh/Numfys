@@ -1,35 +1,66 @@
 using JSON
 using Plots
 using GLM
+using DataFrames
+using ProgressBars
 using Statistics
 include("JSON_functions.jl")
 
 import .JSONFunctions: find_folder
 
-N_0 = 100
-N_1 = 10000
+Ns = [100,200,300,400,500,700,900,1000]
+# Ns = [100, 200, 300, 400, 500, 700, 900, ]
 
-raw_data_0 = JSON.parsefile(find_folder("JSON_files")*"convolution_p_inf_201.json")
-raw_data_1 = JSON.parsefile(find_folder("JSON_files")*"convolution_p_inf_1001.json")
+p_inf_dic = Dict()
+s_dic = Dict()
+q_list = range(0.0,1.0-0.01,step=0.01)
 
-p_inf_0 = raw_data_0["p_inf"]
-q_list_0 = raw_data_0["q"]
-p_inf_1 = raw_data_1["p_inf"]
-q_list_1 = raw_data_1["q"]
-
-p_inf = [log(i) for i in p_inf_1]
-q_list =[log(i) for i in q_list_1]
-
-epsilon_0 = sqrt(N_0)
-epsilon_0_list = [log(epsilon_0) for i in 1:length(p_inf_1)]
-
-epsilon_1 = sqrt(N_1)
-#Find what q the growth of p_inf to q is similar to beta/v*log(epsilon) wtf
-# test_mesurment = findfirst(x, y-> x/y==)
+for n in Ns 
+    p_inf_dic[n] =JSON_info = JSON.parsefile(find_folder("JSON_files") * "convolution_square_$n.json")["p_inf"]
+    p
+end
 
 
-ratio = p_inf./(log(epsilon_0))
+epsilon_list = [log(i) for i in Ns]
+println(length(p_inf_dic[100]))
 
-plot(q_list_1, p_inf_1, label="p_inf", title="Overlayed Plots", xlabel="q", ylabel="Values", legend=:topright)
-plot!(q_list_0, p_inf_0)
+function extract_p_inf(q)
+    p_inf_list = [(log(BigFloat(p[q]))) for p in values(p_inf_dic)]
+    return p_inf_list
+end 
+
+function find_q()
+    q_list = [i for i in range(0.0,1.0-0.01,step=0.01)]
+    highest_coef = 0
+    right_q = nothing
+    for q in ProgressBar(1:100)
+
+        data = DataFrame(y= Float64.(extract_p_inf(q)), x = Float64.(epsilon_list))
+
+    # Fit a linear model
+        model = lm(@formula(y ~ x), data)
+
+        coef_model = coef(model)[2]
+
+    # Check if this is the lowest std
+        if coef_model > highest_coef
+            highest_coef = coef_model
+            right_q = q
+        end
+
+    end
+    println(right_q)
+    println(highest_coef)
+    println(q_list[right_q])
+    return highest_coef, right_q
+end
+
+right_q = find_q()[2]
+
+p_inf_list = extract_p_inf(right_q)
+
+# p_list = [BigFloat(log(i)) for i in p_inf_dic[100]]
+
+plot(epsilon_list, p_inf_list, label="p_inf", title="Overlayed Plots", xlabel="q", ylabel="Values", legend=:topright)
+
 # plot!(q_list_0, epsilon_0_list, label="epsilon_0_list")
