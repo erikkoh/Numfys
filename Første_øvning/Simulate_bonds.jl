@@ -6,20 +6,16 @@ include("JSON_functions.jl")
 
 using  .JSONFunctions: find_folder, write_to_JSON
 
-Random.seed!(144)
+Random.seed!(123456789)
 
 
 function swaping_bonds(bonds_list)
-    println("Swaping bonds")
-    println(length(bonds_list))
     for i in (1:(length(bonds_list)-1))
         candidate_number = rand(i+1:(length(bonds_list)))
         temp = bonds_list[i]
         bonds_list[i] = bonds_list[candidate_number]
         bonds_list[candidate_number] = temp
     end
-    println(length(bonds_list))
-    println("Done!")
     return bonds_list
 end
 
@@ -110,8 +106,8 @@ function simulate_bonds(n::Int)
     return largest_cluster, sites, largest_cluster_list, p_0, p_inf, p_inf_2, susept, s
 end
 
-function simulate_bonds_optimized(n::Int,iteration::Int)
-    JSON_info = JSON.parsefile(find_folder("JSON_files") * "Square_grid_bonds_$n.json")
+function simulate_bonds_optimized(n::Int,iteration::Int, gird_type::String)
+    JSON_info = JSON.parsefile(find_folder("JSON_files") * "$(gird_type)_grid_bonds_$n.json")
     bonds = JSON_info["Bonds"]
     num_bonds =JSON_info["Number of bonds"]
     num_nodes = Int64(bonds[end][1])
@@ -122,15 +118,19 @@ function simulate_bonds_optimized(n::Int,iteration::Int)
     sites = (fill(-1,N))
     largest_cluster = Int64[1,-1]
     number_of_activated_bonds = Int64(0)
-    p_0 = Float64[0.0]
-    p_inf = Float64[1/N]
-    p_inf_2 = Float64[(1/N)^2]
-    susept = Float64[N*(p_inf_2[1]- p_inf[1]^2)^(1/2)]
+    p_0 = Vector{Float64}(undef, num_bonds)
+    p_0[1] = 0
+    p_inf = Vector{Float64}(undef, num_bonds)
+    p_inf[1] = 1/N
+    p_inf_2 = Vector{Float64}(undef, num_bonds)
+    p_inf_2[1] = (1/N)^2
+    susept = Vector{Float64}(undef, num_bonds)
+    susept[1] = N*(p_inf_2[1]- p_inf[1]^2)^(1/2)
     avarage_s = Float64(N)
-    s = Float64[0.0]
-    s_step = Float64(avarage_s-(N*p_inf[end])^2)/(N*(1-p_inf[end]))
+    s = Vector{Float64}(undef,num_bonds)
+    s[1] = 0.0
+    s_step = Float64(avarage_s-(N*p_inf[1])^2)/(N*(1-p_inf[1]))
     steps = Int64(0)
-    println("Start loop")
     for i in (1:num_bonds)
         node1, node2 = bonds[i]
         root1 = find_root_node(node1,sites)
@@ -141,36 +141,28 @@ function simulate_bonds_optimized(n::Int,iteration::Int)
             if sites[root1] < sites[root2]
                 sites[root1] += sites[root2]
                 sites[root2] = root1
-                new_root = find_root_node(root1,sites)
+                new_root = root1
             else
                 sites[root2] += sites[root1]
                 sites[root1] = root2
-                new_root = find_root_node(root2,sites)
+                new_root = root2
             end
             if sites[new_root] < largest_cluster[2]
                 largest_cluster = [new_root,sites[new_root]]
             else
-                s_step = (avarage_s - (N * p_inf[end])^2) / (N * (1 - p_inf[end]))
-                s_step = isfinite(s_step) ? s_step : 0.0  # Ensure s_step is finite
+                s_step = (avarage_s - (N * p_inf[i-1])^2) / (N * (1 - p_inf[i-1]))
+                s_step = isfinite(s_step) ? s_step : 0.0
             end
             avarage_s += sites[new_root]^2
         end
-        push!(s,s_step)
-        push!(p_0, number_of_activated_bonds/num_bonds)
-        push!(p_inf,-largest_cluster[2]/N)
-        push!(p_inf_2,(largest_cluster[2]/N)^2)
-        push!(susept,N*(sum(p_inf_2)/length(p_inf_2) - (sum(p_inf)/length(p_inf))^2)^(1/2))
+        s[i] = s_step
+        p_0[i] = number_of_activated_bonds/num_bonds
+        p_inf[i] = abs(largest_cluster[2]/N)
+        p_inf_2[i] = (largest_cluster[2]/N)^2
+        susept[i] = N*(mean(p_inf_2[i:i]) - (mean(p_inf[i:i]))^2)^(1/2)
         steps += 1
     end
-    println("Number of steps: ", steps)
-    println("P_0: ", p_0[end])
-    println("Number of bonds: ", num_bonds)
-    println("Number of activated bonds: ", number_of_activated_bonds)
-    println("Susceptiblitly: ", susept[end])
-    println(length(s) == length(p_0)==length(p_inf)==length(p_inf_2)==length(susept))
-    println("Started looking for largest cluster:")
-    largest_cluster_list = [i for i in ProgressBar(eachindex(sites)) if find_root_node(i,sites) == largest_cluster[1]]
-    println("Done!")
+    largest_cluster_list = [i for i in (eachindex(sites)) if find_root_node(i,sites) == largest_cluster[1]]
     return largest_cluster, sites, largest_cluster_list, p_0, p_inf, p_inf_2, susept, s
 end
 
@@ -195,20 +187,20 @@ function p_images(p_list)
 end
 
 
-function avarage_values(iterations::Int64, n::Int64)
+function avarage_values(iterations::Int64, n::Int64, grid_type::String)
+    Random.seed!(123456789)
     p_inf_list = []
     susept_list = []
     s_list = []
     p_list = []
     p_inf_2_list = []
-    Threads.@threads for i in ProgressBar(1:iterations)
-        result = simulate_bonds_optimized(n, i)
+    for i in ProgressBar(1:iterations)
+        result = simulate_bonds_optimized(n, i, grid_type)
         p = result[4]
         p_inf = result[5]
         p_inf_2 = result[6]
         susept = result[7]
         s = result[8]
-        println("length of p_inf: ", length(p_inf))
         push!(p_list,p)
         push!(p_inf_list,p_inf)
         push!(p_inf_2_list,p_inf_2)
