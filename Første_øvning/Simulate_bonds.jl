@@ -1,15 +1,16 @@
 import JSON
-import Random
+using Random
 using ProgressBars
 using Base.Threads
 include("JSON_functions.jl")
 
 using  .JSONFunctions: find_folder, write_to_JSON
 
-Random.seed!(123456789)
+# rng = Random.MersenneTwister(123456789)
 
 
-function swaping_bonds(bonds_list)
+function swaping_bonds(bonds_list, rng)
+
     for i in (1:(length(bonds_list)-1))
         candidate_number = rand(i+1:(length(bonds_list)))
         temp = bonds_list[i]
@@ -106,15 +107,8 @@ function simulate_bonds(n::Int)
     return largest_cluster, sites, largest_cluster_list, p_0, p_inf, p_inf_2, susept, s
 end
 
-function simulate_bonds_optimized(n::Int,iteration::Int, gird_type::String)
-    JSON_info = JSON.parsefile(find_folder("JSON_files") * "$(gird_type)_grid_bonds_$n.json")
-    bonds = JSON_info["Bonds"]
-    num_bonds =JSON_info["Number of bonds"]
-    num_nodes = Int64(bonds[end][1])
-    for _i in 1:iteration
-        bonds = swaping_bonds(bonds)
-    end
-    N = Int64(num_nodes)
+function simulate_bonds_optimized(bonds, num_bonds, n::Int,iteration::Int, gird_type::String)
+    N = Int64(n)
     sites = (fill(-1,N))
     largest_cluster = Int64[1,-1]
     number_of_activated_bonds = Int64(0)
@@ -131,6 +125,8 @@ function simulate_bonds_optimized(n::Int,iteration::Int, gird_type::String)
     s[1] = 0.0
     s_step = Float64(avarage_s-(N*p_inf[1])^2)/(N*(1-p_inf[1]))
     steps = Int64(0)
+    sum_p_inf = Float64(0.0)
+    sum_p_inf_2 = Float64(0.0)
     for i in (1:num_bonds)
         node1, node2 = bonds[i]
         root1 = find_root_node(node1,sites)
@@ -148,7 +144,8 @@ function simulate_bonds_optimized(n::Int,iteration::Int, gird_type::String)
                 new_root = root2
             end
             if sites[new_root] < largest_cluster[2]
-                largest_cluster = [new_root,sites[new_root]]
+                largest_cluster[1] = new_root
+                largest_cluster[2] = sites[new_root]
             else
                 s_step = (avarage_s - (N * p_inf[i-1])^2) / (N * (1 - p_inf[i-1]))
                 s_step = isfinite(s_step) ? s_step : 0.0
@@ -159,11 +156,15 @@ function simulate_bonds_optimized(n::Int,iteration::Int, gird_type::String)
         p_0[i] = number_of_activated_bonds/num_bonds
         p_inf[i] = abs(largest_cluster[2]/N)
         p_inf_2[i] = (largest_cluster[2]/N)^2
-        susept[i] = N*(mean(p_inf_2[i:i]) - (mean(p_inf[i:i]))^2)^(1/2)
+        sum_p_inf += p_inf[i]
+        sum_p_inf_2 += p_inf_2[i]
+        mean_p_inf = sum_p_inf / i
+        mean_p_inf_2 = sum_p_inf_2 / i
+        susept[i] = N * sqrt(abs(mean_p_inf_2 - mean_p_inf^2)) #The value of p_inf_2 is always larger og equal to p_inf ^2 but due to rounding errors abs is used to avoid complex roots
         steps += 1
     end
     largest_cluster_list = [i for i in (eachindex(sites)) if find_root_node(i,sites) == largest_cluster[1]]
-    return largest_cluster, sites, largest_cluster_list, p_0, p_inf, p_inf_2, susept, s
+    return largest_cluster, sites, largest_cluster_list, p_0, p_inf, p_inf_2, susept, s, bonds
 end
 
 function testing_speed()
@@ -188,19 +189,25 @@ end
 
 
 function avarage_values(iterations::Int64, n::Int64, grid_type::String)
-    Random.seed!(123456789)
+    rng = Random.MersenneTwister(123456789)
+    JSON_info = JSON.parsefile(find_folder("JSON_files") * "$(grid_type)_grid_bonds_$n.json")
+    bonds = JSON_info["Bonds"]
+    num_bonds =JSON_info["Number of bonds"]
+    num_nodes = Int64(bonds[end][1])
     p_inf_list = []
     susept_list = []
     s_list = []
     p_list = []
     p_inf_2_list = []
     for i in ProgressBar(1:iterations)
-        result = simulate_bonds_optimized(n, i, grid_type)
+        bonds = swaping_bonds(bonds, rng)
+        result = simulate_bonds_optimized(bonds, num_bonds, num_nodes, i, grid_type)
         p = result[4]
         p_inf = result[5]
         p_inf_2 = result[6]
         susept = result[7]
         s = result[8]
+
         push!(p_list,p)
         push!(p_inf_list,p_inf)
         push!(p_inf_2_list,p_inf_2)
