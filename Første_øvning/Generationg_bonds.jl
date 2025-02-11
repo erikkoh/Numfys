@@ -22,30 +22,27 @@ end
 
 
 #Grid:
-#     x
-#    / \
-#   x---x
-#  / \ / \
+# x---x---x 
+# | \ | \ |
+# x---x---x
+# | \ | \ |
 # x---x---x
 
 function Triangular_bonds(L::Int)
     bonds = []
-    row_start_func = x -> (x*(x-1)) ÷ 2 + 1
-    artimic_sum = x -> (x*(x+1)) / 2
-    for i in 1:Int(artimic_sum(L))
-        row_num = floor(Int, (sqrt(8 * (i - 1) + 1) - 1) / 2) + 1
-        row_start = Int(row_start_func(row_num))
-        row_length = row_num
-        row_pos = i - row_start + 1
-        
-        
-        right_neighbour = if row_pos < row_length i + 1 else row_start end
-        down_left_neighbour = if row_num < L i + row_length else Int(artimic_sum(row_pos)) end
-        down_right_neighbour = if row_num < L i + row_length + 1 else Int(row_start_func(L-row_pos + 1)) end
-        
-        neighbor = [right_neighbour, down_left_neighbour, down_right_neighbour]
-        
-        push!(bonds, neighbor)
+    for i in 1:L^2
+        row_pos = (i-1)%L + 1
+        collum_pos = div(i-1,L) + 1
+        row_neighbour = [i,( (row_pos) % L + 1) + (collum_pos-1)*L]
+        down_neighbour = [i, (row_pos) + (collum_pos % L  )*L]
+        if collum_pos != L
+            down_right_neighbour = [i, if row_pos != L down_neighbour[2] + 1 else L-collum_pos + 1 end]
+        else
+            down_right_neighbour = [i, 1 + L*(L-row_pos) ]
+        end
+        push!(bonds,row_neighbour)
+        push!(bonds,down_neighbour)
+        push!(bonds, down_right_neighbour)
     end
     return Dict("Number of bonds" => length(bonds), "Bonds" => bonds)
 end
@@ -101,5 +98,3 @@ function Honey_comb_grid(L::Int)
     end
     return Dict("Number of bonds" => length(bonds), "Bonds" => bonds)
 end
-
-
