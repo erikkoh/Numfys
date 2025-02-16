@@ -13,13 +13,14 @@ import .JSONFunctions: find_folder, write_to_JSON
 function find_critical_exponents(grid_type::String)
 
     Ns = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+    # Ns = [100, 200, 300, 400]
     p_inf_dic = Dict()
     s_dic = Dict()
 
     for n in Ns 
         JSON_info = JSON.parsefile(find_folder("JSON_files") * "convolution_$(grid_type)_$n.json")
-        p_inf_dic[n] = round.((JSON_info["p_inf"]), digits= 3)
-        s_dic[n] = round.(JSON_info["s"], digits = 2)
+        p_inf_dic[n] = round.((JSON_info["p_inf"]),digits=2)
+        s_dic[n] = (JSON_info["s"])
     end
 
 
@@ -32,7 +33,8 @@ function find_critical_exponents(grid_type::String)
 
 
     function find_q_and_prop()
-        q_list = [i for i in range(0.0,1.0-0.001,step=0.001)]
+        q_list = 0.001:0.0001:1.0-0.001
+        # q_list = 0.001:0.001:1.0-0.01  
         slope = 0.0
         highest_cor = 0.0
         right_q = NaN
@@ -56,12 +58,12 @@ function find_critical_exponents(grid_type::String)
             current_cor = 1 - (SS_res / SS_tot)
 
             current_cor = r2(model)
-            current_cor = if current_cor<0 0.0 else current_cor end
+            # current_cor = if current_cor<0 0.0 else current_cor end
+            # current_cor = cor(data.y, data.x)
 
-            
             push!(r2_list, current_cor)
         
-            if current_cor > highest_cor
+            if abs(current_cor) > abs(highest_cor)
                 highest_cor = current_cor
                 slope = coef_model
                 right_q = q
@@ -76,8 +78,10 @@ function find_critical_exponents(grid_type::String)
     end
 
     function test_for_know_q(func)
-        q = 501
-        q_list = [i for i in range(0.0,1.0-0.001,step=0.001)]
+        q = 5000-9
+        # q = 500
+        q_list = 0.001:0.0001:1.0-0.001
+        # q_list = 0.001:0.001:1.0-0.01  
         println("Test q: ", q_list[q])
         y_values = Float64.(func(q))
         x_values = Float64.(log.(Ns)) 
@@ -99,7 +103,7 @@ function find_critical_exponents(grid_type::String)
         model = lm(@formula(y ~ x), data)
         
         scatter(data.x, data.y)
-        plot!(data.x, predict(model))
+        plot!(data.x, predict(model), xlabel="log(N)/2", ylabel="log(Smax)", title= "Smax")
         savefig("linarregress_s_max")
         coef_model = coef(model)[2]
         return coef_model
@@ -113,7 +117,8 @@ function find_critical_exponents(grid_type::String)
     end
 
     function find_nu()
-        q_list = [i for i in range(0.0, 1.0-0.001, step=0.001)]
+        q_list = 0.001:0.0001:1.0-0.001
+        # q_list = 0.001:0.001:1.0-0.01  
         s_list = [maximum(s_dic[n]) for n in Ns]
         max_q_index = []
         for i in eachindex(s_list)
@@ -158,3 +163,9 @@ function find_critical_exponents(grid_type::String)
     write_to_JSON(results_dic, "Results_$(grid_type)_grid")
 
 end
+
+find_critical_exponents("Square")
+
+
+JSON_info = JSON.parsefile(find_folder("JSON_files") * "Results_Square_grid.json")
+println(JSON_info)

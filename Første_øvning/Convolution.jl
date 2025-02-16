@@ -82,7 +82,7 @@ function convelute_data(N::Int,grid_stype::String)
     JSON_info = JSON.parsefile(find_folder("JSON_files") * "$(grid_stype)_Grid_simulation_$N"*".json")
     p_inf = Float64.(JSON_info["p_inf"])
     s = Float64.(JSON_info["s"])
-    suseptibility = JSON_info["susept"]
+    suseptibility = Float64.(JSON_info["susept"])
     p_list = JSON_info["p"]
     binomial_coefficients = calculating_binomial_coefficients(length(p_inf))
     println("Started convolution for p_inf")
@@ -101,24 +101,27 @@ end
 function plotting_all_convoluted_values()
     
     Ns = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
-    Ns = [100, 200, 300, 400]
     p_inf_dic = Dict()
     s_dic = Dict()
+    suscept_dic = Dict()
     q_list = 0.001:0.0001:1.0-0.001
-    # q_list = 0.001:0.001:1.0-0.01  
+
 
     for n in Ns 
         JSON_info = JSON.parsefile(find_folder("JSON_files") * "convolution_square_$(n).json")
         p_inf_dic[n] = Float64.(JSON_info["p_inf"])
         s_dic[n] = Float64.(JSON_info["s"])
+        suscept_dic[n] = Float64.(JSON_info["suscept"])
     end
     
-    plot(title= "P_Inf", xlabel="q", ylabel="P_inf")
+    property_dic = Dict("P_inf" => p_inf_dic,"S" => s_dic, "Susceptiblitly" => suscept_dic)
 
-    for k in keys(p_inf_dic)
-        p_list = p_inf_dic[k]
-        plot!(q_list, p_list, label="N = $k")
+    for (keys, values) in property_dic
+        plot(title= keys, xlabel="q", ylabel=keys)
+        for k in Ns
+            p_list = values[k]
+            plot!(q_list[3500:6500], p_list[3500:6500], label="N = $(k^2)")
+        end
+        savefig(find_folder("Convolution_plots")*"all_convoluted_$keys")
     end
-    savefig(find_folder("Convolution_plots")*"all_convoluted")
-
 end

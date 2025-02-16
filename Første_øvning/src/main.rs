@@ -94,17 +94,13 @@ fn simulate_bonds_rust(num:i64, iteration:usize)-> (Vec<f64>, Vec<f64>, Vec<f64>
     let num_bonds: f64 = bonds.num_bonds as f64;
     let mut sites = vec![-1.0; n as usize];
     let mut largest_clust= [1.0, -1.0]; // Initial largest cluster
-    let mut number_of_activated_bonds = 0.0; // Counter for activated bonds
-    let mut p_inf = Vec::with_capacity(bonds_list.len());
-    p_inf.push( 1.0 / (n as f64)); // Probability vector
-    let mut p_0 = Vec::with_capacity(bonds_list.len());
-    p_0.push(0.0);
-    let mut p_inf_2 = Vec::with_capacity(bonds_list.len());
-    p_inf_2.push((1.0 / n as f64).powf(2.0));
-    let mut s = Vec::with_capacity(bonds_list.len());
-    s.push( 0.0);
-    let mut susept = Vec::with_capacity(bonds_list.len());
-    susept.push((n as f64) * (p_inf_2[0].powf(2.0) - p_inf[0].powf(2.0)).powf(1.0 / 2.0));
+    let mut number_of_activated_bonds: f64 = 0.0; // Counter for activated bonds
+    println!("{:?}",bonds_list.len());
+    let mut p_inf: Vec<f64> = vec![0.0; bonds_list.len()];
+    let mut p_0: Vec<f64> = vec![0.0; bonds_list.len()];
+    let mut p_inf_2: Vec<f64> = vec![(1.0/n as f64).powf(2.0); bonds_list.len()];
+    let mut s: Vec<f64> = vec![0.0; bonds_list.len()];;
+    let mut susept: Vec<f64> = vec![(n as f64) * (p_inf_2[0].powf(2.0) - p_inf[0].powf(2.0)).powf(1.0 / 2.0); bonds_list.len()];
     let mut avarage_s: f64 = n as f64; // Average size
     let mut s_step: f64 = (avarage_s - ((n as f64) * p_inf[0]).powf(2.0)) / ((n as f64) * (1.0 - p_inf[0]));
     for i in 0..(bonds_list.len()){
@@ -112,11 +108,11 @@ fn simulate_bonds_rust(num:i64, iteration:usize)-> (Vec<f64>, Vec<f64>, Vec<f64>
         let current_bonds =  &bonds_list[i];
         let node1= current_bonds[0];
         let node2 = current_bonds[1];
-        let root1 = find_root_node(node1, &mut sites) as usize;
-        let root2 = find_root_node(node2, &mut sites) as usize;
+        let root1 = find_root_node(node1, &mut sites);
+        let root2 = find_root_node(node2, &mut sites);
         let new_root: usize;
         if root1 != root2{
-            avarage_s += -(sites[root1 as usize] as f64).powf(2.0) - (sites[root2 as usize] as f64).powf(2.0);
+            avarage_s += -(sites[root1 as usize] as f64).powf(2.0) - (sites[root2] as f64).powf(2.0);
             if sites[root1] < sites[root2]{
                 sites[root1] += sites[root2];
                 sites[root2] = root1 as f64;
@@ -128,20 +124,21 @@ fn simulate_bonds_rust(num:i64, iteration:usize)-> (Vec<f64>, Vec<f64>, Vec<f64>
                 new_root = root2;
             }
             if sites[new_root] < largest_clust[1]{
-                largest_clust = [new_root as f64, sites[new_root]]
+                largest_clust[0] = new_root as f64;
+                largest_clust[1] = sites[new_root];
             }
             else {
-                s_step = (avarage_s - ((n as f64) * p_inf[0]).powi(2)) / ((n as f64) * (1.0 - p_inf[0]));
+                s_step = (avarage_s - ((n as f64) * p_inf[i-1]).powi(2)) / ((n as f64) * (1.0 - p_inf[i-1]));
                 s_step = if s_step.is_finite() { s_step } else { 0.0 };
             }
             avarage_s += sites[new_root].powf(2.0);
         }
-        s.push(s_step);
-        p_0.push(number_of_activated_bonds/num_bonds);
-        p_inf_2.push((largest_clust[1]/(n as f64)).powf(2.0));
+        s[i] = s_step;
+        p_0[i] = number_of_activated_bonds/num_bonds;
+        p_inf_2[i] =(largest_clust[1]/(n as f64)).powf(2.0);
         let p_inf_2_mean = p_inf_2.iter().sum::<f64>() / p_inf_2.len() as f64;
         let p_inf_mean = p_inf.iter().sum::<f64>() / p_inf.len() as f64;
-        susept.push( (n as f64) * ((p_inf_2_mean - p_inf_mean.powi(2)).max(0.0)).sqrt());
+        susept[i] =  (n as f64) * ((p_inf_2_mean - p_inf_mean.powi(2)).max(0.0)).sqrt();
     }
     (p_0, p_inf, p_inf_2, susept, s)
 }

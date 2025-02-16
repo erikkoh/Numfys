@@ -108,8 +108,8 @@ function simulate_bonds(n::Int)
 end
 
 function simulate_bonds_optimized(bonds, num_bonds, n::Int,iteration::Int, gird_type::String)
-    N = Int64(n)
-    sites = (fill(-1,N))
+    N = Float64(n)
+    sites = (fill(-1,Int64(N)))
     largest_cluster = Int64[1,-1]
     number_of_activated_bonds = Int64(0)
     p_0 = Vector{Float64}(undef, num_bonds)
@@ -163,7 +163,8 @@ function simulate_bonds_optimized(bonds, num_bonds, n::Int,iteration::Int, gird_
         susept[i] = N * sqrt(abs(mean_p_inf_2 - mean_p_inf^2)) #The value of p_inf_2 is always larger og equal to p_inf ^2 but due to rounding errors abs is used to avoid complex roots
         steps += 1
     end
-    largest_cluster_list = [i for i in (eachindex(sites)) if find_root_node(i,sites) == largest_cluster[1]]
+    # largest_cluster_list = [i for i in (eachindex(sites)) if find_root_node(i,sites) == largest_cluster[1]]
+        largest_cluster_list = [1]
     return largest_cluster, sites, largest_cluster_list, p_0, p_inf, p_inf_2, susept, s, bonds
 end
 
@@ -207,7 +208,6 @@ function avarage_values(iterations::Int64, n::Int64, grid_type::String)
         p_inf_2 = result[6]
         susept = result[7]
         s = result[8]
-
         push!(p_list,p)
         push!(p_inf_list,p_inf)
         push!(p_inf_2_list,p_inf_2)
