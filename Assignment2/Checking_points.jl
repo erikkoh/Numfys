@@ -1,5 +1,8 @@
 include("generate_koch_kurve.jl")
-import .KochCurve: generate_square
+using Plots
+using HDF5
+using ProgressBars
+
 
 
 
@@ -8,47 +11,87 @@ function does_intersect(p1::Vector{Float64}, p2::Vector{Float64}, point::Vector{
         p1, p2 = p2, p1
     end
     if p1[2] <= point[2] < p2[2]
-        x_intersect = (point[2] + 0.001 - p1[1]) * (p2[1] - p1[1]) / (p2[2] - p1[2]) + p1[1]
-        return x_intersect > point[1]
+        return (point[2] + 0.001 - p1[1]) * (p2[1] - p1[1]) / (p2[2] - p1[2]) + p1[1] > point[1]
     end 
     return false
 end
 
 function in_boundry(point::Vector{Float64}, boundry::Vector{Vector{Float64}})
     count = 0
-    for i in eachindex(boundry)
-        if does_intersect(boundry[i], boundry[mod((i+1), length(boundry))+1], point)
-            count += 1
+    list_length = length(boundry)
+    if point in boundry
+        return false
+    else
+        for i in eachindex(boundry)
+            if does_intersect(boundry[i], boundry[((i)%(list_length-1))+1], point)
+                count += 1
+            end
         end
     end
     return count % 2 == 1
 end
 
 
-function generate_grid(l)
-    grid_size = 4^l
-    if l< 3
-        grid_size = 4^3
-    end
+
+function generate_grid(l::Int)
+    grid_size = max(4^l, 4^3)
     boundary = generate_square(l, grid_size)
-    x_boundry = [point[1] for point in boundary]
-    y_boundry = [point[2] for point in boundary]
-    x_min, x_max = minimum(x_boundry), maximum(x_boundry)
-    y_min, y_max = minimum(y_boundry), maximum(y_boundry)
-    println((x_min, x_max, y_min, y_max))
-    grid_x = range(x_min, x_max, length=grid_size)
-    grid_y = range(y_min, y_max, length=grid_size)
-    grid = [[x, y] for x in grid_x for y in grid_y]
-    grid_z = [in_boundry(point, boundary) for point in grid]
-    grid_x_coords = [point[1] for point in grid]
-    grid_y_coords = [point[2] for point in grid]
-    return hcat(grid_x_coords, grid_y_coords, grid_z)
+    x_boundary = [point[1] for point in boundary]
+    y_boundary = [point[2] for point in boundary]
+    x_min, x_max = Int(floor(minimum(x_boundary))), Int(ceil(maximum(x_boundary)))   
+    y_min, y_max = Int(floor(minimum(y_boundary))), Int(ceil(maximum(y_boundary))) 
+    grid_x = collect(x_min:x_max)
+    grid_y = collect(y_min:y_max)
+    grid = [[Float64(x), Float64(y)] for y in grid_y for x in grid_x]
+    grid_z = [in_boundry(Float64.(point), boundary) for point in ProgressBar(grid)]
+    grid = [[point[1], point[2], in_boundry] for (point, in_boundry) in zip(grid, grid_z)]
+    return hcat(grid...), boundary
 end
 
 function checking_speed()
+    println("Checking speed")
     @time begin
-        grid = generate_grid(4)
+        grid, _ = generate_grid(4)
         println(size(grid))
-        println(grid[end, :])
+        println(typeof(grid))
+        println(grid[end,:])
     end
+end
+function plotting_grid()
+    grid, _ = generate_grid(4)
+    z = grid[:,3]
+    grid_size = Int(sqrt(length(z)))
+    z_matrix = reshape(z, grid_size, grid_size)
+    p1 = heatmap(z_matrix, xlabel="X-axis", ylabel="Y-axis", title="Grid")
+    display(p1)
+end
+
+function checking_if_boundary_is_included()
+    grid, boundary = generate_grid(1)
+    grid = convert(Array{Float64, 2}, grid)
+    println(grid[:,9])
+    println(boundary[1])
+    similar_points = [grid[i, j] for i in 1:size(grid, 1), j in 1:size(grid, 2) if grid[i, j] in boundary]
+    return similar_points, length(similar_points) == length(boundary)
+end
+
+
+function write_grid_to_file(l::Int)
+    grid, boundary = generate_grid(l)
+    
+    grid = convert(Array{Float64, 2}, grid)
+    num_rows = length(boundary)
+    num_cols = length(boundary[1])    
+    flat_vector = vcat(boundary...)
+    boundary_matrix = reshape(flat_vector, num_cols, num_rows)
+
+    h5open("./Assignment2/HDF5_files/grid_boundary$l.h5", "w") do file
+        write(file, "grid", grid)
+        write(file, "boundary", boundary_matrix)
+    end
+end
+
+for i in 1:4
+    println("started writing for l=$i")    
+    write_grid_to_file(i)
 end

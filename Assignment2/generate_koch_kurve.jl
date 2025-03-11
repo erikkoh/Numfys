@@ -115,4 +115,3 @@ function generate_square(l, size)
     return adjusted_points
 end
 
-plotting_square(6, 4^3)
