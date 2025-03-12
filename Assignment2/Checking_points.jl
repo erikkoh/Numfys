@@ -50,13 +50,9 @@ function in_boundary_2(point::Vector{Float64}, boundary::Vector{Vector{Float64}}
         vec_next = next_point - point
         angle_val = angle(vec_next, vec_prev)
         cross_sign = cross_product_sign(vec_prev, vec_next)
-        if cross_sign < 0
-            count -= angle_val
-        else
-            count += angle_val
-        end
+        count += cross_sign < 0 ? -angle_val : angle_val
     end
-     return abs(count - 360) < 0.1 
+     return abs(count/360 - 1) <  0.1 
 end
 
 function generate_grid(l::Int, checking_func = in_boundary)
