@@ -54,7 +54,6 @@ function euler_implicit(V0, nx::Int, nt::Int,t_end::Float64, a::Float64, b::Floa
         solution_array[2:end-1] = interior_solution
         apply_neumann!(solution_array)
         solution[t,:] = solution_array
-
     end
     return solution
 end
@@ -63,9 +62,9 @@ end
 function crank_nicolson(V0, nx::Int, nt::Int,t_end::Float64, a::Float64, b::Float64, λ = 1.0 , τ = 1.0 )
     dt = t_end/nt
     dx = (b-a)/(nx)
-    α = 1/dt + 1/2 + 1/dx^2
-    β = -1/2*1/dx^2
-    γ = 1/dt - 1/2 - 1/dx^2
+    α = 1/dt + 1/(2*τ) + λ^2/(τ*dx^2)
+    β = -1/(2*τ)*λ^2/dx^2
+    γ = 1/dt - 1/(2*τ) - λ^2/dx^2
     δ = -β
     N = nx-2
     diagonals_next = [β*ones(N-1),  α*ones(N),  β*ones(N-1)]
@@ -112,9 +111,8 @@ plot(t,sol_explicit[:,1], xlabel = "time", ylabel = "V" ,title="Potential for fi
 plot!(t,sol_implicit[:,1], label="Euler implicit")
 plot!(t,sol_crank[:,1], label = "Crank-Nicolson")
 
+surface(x,t, sol_explicit)
+surface(x,t, sol_implicit)
 surface(x, t, sol_crank, xlabel="x", ylabel="t", zlabel="V",
         title="Surface plot of V(x, t)", camera = (80, 30))
-surface(x,t, sol_implicit)
-surface(x,t, sol_explicit)
-
 
