@@ -2,15 +2,6 @@ using Plots
 using LinearAlgebra
 using SparseArrays
 
-function g_Na(V,γ =0.5, V_star = -40.0)
-    result =  100 ./(1 .+ exp.(γ.*(V_star .- V))) .+ 1/5
-    # println("g_Na = ", result)
-    return result
-end
-
-function reaction_term(V, g_K = 5.0, nu_Na = 56, nu_K = -76)
-    return (((g_Na(V))*(V- nu_Na) + g_K*(V - nu_K))) 
-end
 
 function g_K_reaction(V, V_star = -40.0, γ = 0.5)
     return 100 ./(1 .+ exp.((V_star .- V)*γ)) + 1/5
@@ -19,26 +10,24 @@ end
 function updating_h(h, V, gamma = 1.0, V_mem = -70.0)
     V_m = -V_mem - V
     α_h = gamma*(0.07 * exp(-(V_m) / 20))
-    β_h = gamma*(1.0 / (1 + exp((30-V_m) / 10)))
+    β_h = gamma*(1.0 / (1 + exp((40-V_m) / 10)))
     return (α_h * (1 - h) - β_h * h)
 end
 
-function g_Na_2(V, γ = 0.5, V_star = -40.0)	
-    V_m = -V_mem - V
-    conduct =  (100.0/(1 + exp(γ*(V_star - V_m))) + 1/5)
+function g_Na(V, γ = 0.5, V_star = -40.0)	
+    conduct =  100.0/(1 + exp(γ*(V_star - V))) + 1/5
     return conduct 
 end
 
 
 function reaction_term_h_dependent(V, h, g_K = 5.0,nu_Na = +56, nu_K = -76)
-    # println(g_Na_2(V, x)/g_K) 
-    # h here is an relaxation parameter
-    return g_Na_2(V)*h*(V - nu_Na) + g_K * (V -  nu_K)
+    # h is ment to either disable or enable the sodium channel
+    return g_Na(V)/g_K*h*(V - nu_Na) + (V -  nu_K)
 end
 
 
-#todo: fixe point iteration and implement crank nickelson for relaxation perameter
-function crank_nicolson(V0, nx::Int, nt::Int,t_end::Float64, a::Float64, b::Float64, λ = 0.18 , τ = 2.0)	
+#todo: fixed point iteration and implement crank nickelson for relaxation perameter
+function crank_nicolson(V0, nx::Int, nt::Int,t_end::Float64, a::Float64, b::Float64, x0::Float64, λ = 0.18 , τ = 2.0)	
     dt = t_end/nt
     dx = (b-a)/(nx)
     r = (λ^2/(τ)) * (dt/(2*dx^2)) 
@@ -65,7 +54,7 @@ function crank_nicolson(V0, nx::Int, nt::Int,t_end::Float64, a::Float64, b::Floa
     solution[1, :] = V0
     for t in 2:nt
         h_array = h_array .+ dt*updating_h.(h_array, solution[t-1, :])
-        reaction = reaction_term_x_dependent.(solution[t-1, :], h_array)
+        reaction = reaction_term_h_dependent.(solution[t-1, :], h_array)
         b_int = A_previous*solution[t-1, :] .- dt/τ.* reaction
         interior_solution = A_next \ b_int
         solution[t,:] = interior_solution
@@ -73,7 +62,7 @@ function crank_nicolson(V0, nx::Int, nt::Int,t_end::Float64, a::Float64, b::Floa
     return solution
 end
 
-function crank_nicolson_fixed_point(V0, nx::Int, nt::Int,t_end::Float64, a::Float64, b::Float64, λ = 0.18 , τ = 2.0)
+function crank_nicolson_fixed_point(V0, nx::Int, nt::Int,t_end::Float64, a::Float64, b::Float64, x_0::Float64, λ = 0.18 , τ = 2.0)
     max_iter = 100
     dt = t_end/nt
     dx = (b-a)/(nx)
@@ -83,7 +72,6 @@ function crank_nicolson_fixed_point(V0, nx::Int, nt::Int,t_end::Float64, a::Floa
     β = -r
     γ_2 = 1 - 2*r 
     δ = r
-    N = nx-2
     diagonals_next = [β*ones(nx-1),  α*ones(nx),  β*ones(nx-1)]
     digonals_previous = [δ*ones(nx-1), γ_2*ones(nx), δ*ones(nx-1)]
     A_next = spdiagm(-1 => diagonals_next[1], 0 => diagonals_next[2], 1 => diagonals_next[3])
@@ -99,22 +87,23 @@ function crank_nicolson_fixed_point(V0, nx::Int, nt::Int,t_end::Float64, a::Floa
     solution = zeros(Float64, nt, nx)
     solution[1, :] = V0
     h_array = fill(0.0, nx)
-    calculate_NA_channles = Int(0.10/dx)
-    h_array[calculate_NA_channles:end] .= 1.0
+    calculate_NA_channles_plus = Int(round((x_0+0.25)/dx))
+    calculate_NA_channles_neg = Int(round((x_0+0.25)/dx))
+    h_array[calculate_NA_channles_plus:end] .= 1.0
+    h_array[1:calculate_NA_channles_neg] .= 1.0
     for t in 2:nt
-        h_array = h_array .+ dt*updating_h.(h_array, solution[t-1, :])
         previus_reaction = reaction_term_h_dependent.(solution[t-1, :], h_array)
         b_int = A_previous*solution[t-1, :] .- dt/τ.*previus_reaction# the average of the nonlinear term is simply the nonlinear for the previous value 
         interior_solution = A_next \ b_int
         v_temp = interior_solution 
-        #Fixed point iteration
-        for j in 1:max_iter
-            b_int = A_previous*solution[t-1, :] .- dt/(2*τ).*(previus_reaction + reaction_term_h_dependent.(v_temp, h_array))
+        previous_vec = A_previous*solution[t-1, :] 
+        # Fixed point iteration
+        for _j in 1:max_iter
+            b_int = previous_vec .- dt/(2*τ).*(previus_reaction + reaction_term_h_dependent.(v_temp, h_array))
             interior_solution = A_next \ b_int
             v_next  = interior_solution
-            if norm(v_next-v_temp,Inf) < tol
-                # println("Iteration $j, and at $t norm = ", norm(v_next - v_temp))
-                v_temp = v_next
+            if norm(v_next-v_temp,2) < tol
+                v_temp = v_next 
                 break
             end
             v_temp = v_next
@@ -124,26 +113,44 @@ function crank_nicolson_fixed_point(V0, nx::Int, nt::Int,t_end::Float64, a::Floa
     return solution
 end
 
+function find_lowest_inpulse(V_mem::Int , nx::Int, t_end::Float64, a::Float64, b::Float64, x_0::Float64, λ = 0.18, τ = 2.0)
+    V0 = (V_appl - V_mem) .* exp.(-((x .- x0).^2) ./ (2*λ^2)) .+ V_mem
+    for V_appl in -70.0:0.1:0.0
+        V0 = (V_appl - V_mem) .* exp.(-((x .- x_0).^2) ./ (2*λ^2)) .+ V_mem
+        solution = crank_nicolson_fixed_point(V0, nx, Int(t_end/dx), t_end, a, b, x_0, λ, τ)
+        if maximum(solution[:, critical_index]) > 0.0
+            println("Lowest V_appl to induce action potential: ", V_appl)
+            return V_appl
+        end
+    end
+    println("No action potential induced within the tested range.")
+    return nothing
+end
+
+
+
 
 # Define parameters for action potential modeling
 a = 0.0
-b = 1.0
+b = 10.0
 λ = 0.18
 V_mem = -70
-V_appl = -30
+V_appl = -40
 nx = 1_00
-nt = 20_000
+nt = 2_000
 dx = (b-a)/nx
 time_stop = 10.0
-x0 = 0.0
+x0 = (b-a)/2
 t = range(0, time_stop, length=nt)
 x = range(a, b, length=nx)
-critical_index = Int(0.25/dx)
+critical_index = Int(round(0.25/dx))
 V0 = (V_appl - V_mem) .* exp.(-((x .- x0).^2) ./ (2*λ^2)) .+ V_mem
 
 
 # Solve using Crank-Nicolson fixed point method
-solution_crank = crank_nicolson_fixed_point(V0, nx, nt, time_stop, a, b, λ)
+solution_crank = crank_nicolson_fixed_point(V0, nx, nt, time_stop, a, b, x0, λ)
+
+find_lowest_inpulse(V_mem, nx, time_stop, a, b, x0, λ)
 
 # Plot results
 d3 = plot(t, solution_crank[:, critical_index], xlabel="time", ylabel="V", title="Potential for first point over time", label="Crank Nicolson")
@@ -155,26 +162,3 @@ savefig(d1, "./Assignment3/plots/Heatplot_test")
 d2 = surface(x, t, solution_crank)
 savefig(d2, "./Assignment3/plots/Surface_plot")
 
-
-# a = 0.0
-# b = 1.0
-# λ = 0.18
-# V_mem = -70
-# V_appl = -50
-# nx = 1_000
-# nt = 2_000
-# time_stop = 4.0
-# x0 = 0.5
-# t = range(0,time_stop, length = nt)
-# x = range(a,b, length=nx)
-# V0 = (V_appl - V_mem).* exp.( -((x .- x0).^2)./(2*λ^2)) .+ V_mem
-
-
-# solution_crank = crank_nicolson_fixed_point(V0, nx, nt,time_stop, a, b, λ )
-# d3 = plot(t,solution_crank[:,1], xlabel = "time", ylabel = "V" ,title="Potential for first point over time", label= "Crank Nicolson")
-# savefig(d3, "./Assignment3/plots/First_point_over_time")
-
-# d1 = heatmap(x, t, solution_crank, xlabel="x", ylabel="time", title="Heatmap of the Crank-Nicolson Fixed Point Simulation", colorbar_title="V")
-# savefig(d1, "./Assignment3/plots/Heatplot_test")
-# d2 = surface(x,t,solution_crank)
-# savefig(d2, "./Assignment3/plots/Surface_plot")
