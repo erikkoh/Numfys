@@ -175,7 +175,9 @@ function analyze_error_with_dt(a, b, x0, λ, τ, nx, nt_list, t_end, late::Bool=
     # Add trend lines for Δt and Δt²
     trend_line_dt = dt_values 
     trend_line_dt2 = dt_values .^ 2
-    plot!(log10.(dt_values), log10.(trend_line_dt*errors_crank[1]/trend_line_dt[1]), lw=2, ls=:dash, label="Δt trend")
+    if !late
+        plot!(log10.(dt_values), log10.(trend_line_dt*errors_crank[1]/trend_line_dt[1]), lw=2, ls=:dash, label="Δt trend")
+    end
     plot!(log10.(dt_values), log10.(trend_line_dt2*errors_crank[1]/trend_line_dt2[1]), lw=2, ls=:dash, label="Δt² trend")
     if !late
     savefig("error_vs_dt.png")
@@ -231,7 +233,7 @@ time_stop_2 = 125.0
 λ = 1.0
 τ = 1.0
 x0 = (b-a)/2
-dt_n_list =Int.(round.(time_stop ./ dt_list[1:end-3])) 
+dt_n_list =Int.(round.(time_stop ./ dt_list[1:end-3]))# the higher dt values reulsts in vectors of length 0
 dt_n_list_2 =Int.(round.(time_stop_2 ./ dt_list))
 
 t = range(0,time_stop, length = nt)
@@ -245,7 +247,7 @@ V0 = analytical.(x, 1.0)
 analyse_error_with_time(a,b,x0,nx, nt, 1.0, λ, τ)
 analyze_error_with_dx(a, b, x0, λ, τ, nx_list, nt, time_stop)
 analyze_error_with_dt(a, b, x0, λ, τ, nx, dt_n_list ,time_stop)
-analyze_error_with_dt(a, b, x0, λ, τ, nx, dt_n_list_2[1:end-4] ,time_stop_2, true)
+analyze_error_with_dt(a, b, x0, λ, τ, nx, dt_n_list_2 ,time_stop_2, true)
 
 
 
