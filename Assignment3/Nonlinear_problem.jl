@@ -3,6 +3,12 @@ using LinearAlgebra
 using SparseArrays
 
 
+if !isdir("plots")
+    mkdir("plots")
+end
+
+
+
 function g_K_reaction(V, V_star = -40.0, γ = 0.5)
     return 100 ./(1 .+ exp.((V_star .- V)*γ)) + 1/5
 end
@@ -114,7 +120,6 @@ function crank_nicolson_fixed_point(V0, nx::Int, nt::Int,t_end::Float64, a::Floa
 end
 
 function find_lowest_inpulse(V_mem::Int , nx::Int, t_end::Float64, a::Float64, b::Float64, x_0::Float64, λ = 0.18, τ = 2.0)
-    V0 = (V_appl - V_mem) .* exp.(-((x .- x0).^2) ./ (2*λ^2)) .+ V_mem
     for V_appl in -70.0:0.1:0.0
         V0 = (V_appl - V_mem) .* exp.(-((x .- x_0).^2) ./ (2*λ^2)) .+ V_mem
         solution = crank_nicolson_fixed_point(V0, nx, Int(t_end/dx), t_end, a, b, x_0, λ, τ)
@@ -135,7 +140,6 @@ a = 0.0
 b = 10.0
 λ = 0.18
 V_mem = -70
-V_appl = -40
 nx = 1_00
 nt = 2_000
 dx = (b-a)/nx
@@ -144,13 +148,14 @@ x0 = (b-a)/2
 t = range(0, time_stop, length=nt)
 x = range(a, b, length=nx)
 critical_index = Int(round(0.25/dx))
+V_appl = find_lowest_inpulse(V_mem, nx, time_stop, a, b, x0, λ)
 V0 = (V_appl - V_mem) .* exp.(-((x .- x0).^2) ./ (2*λ^2)) .+ V_mem
+
 
 
 # Solve using Crank-Nicolson fixed point method
 solution_crank = crank_nicolson_fixed_point(V0, nx, nt, time_stop, a, b, x0, λ)
 
-find_lowest_inpulse(V_mem, nx, time_stop, a, b, x0, λ)
 
 # Plot results
 d3 = plot(t, solution_crank[:, critical_index], xlabel="time", ylabel="V", title="Potential for first point over time", label="Crank Nicolson")
@@ -159,6 +164,4 @@ savefig(d3, "./Assignment3/plots/First_point_over_time")
 d1 = heatmap(x, t, solution_crank, xlabel="x", ylabel="time", title="Heatmap of the Crank-Nicolson Fixed Point Simulation", colorbar_title="V")
 savefig(d1, "./Assignment3/plots/Heatplot_test")
 
-d2 = surface(x, t, solution_crank)
-savefig(d2, "./Assignment3/plots/Surface_plot")
 

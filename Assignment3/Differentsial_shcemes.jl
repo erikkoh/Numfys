@@ -5,6 +5,12 @@ using Printf
 using ProgressBars
 using Statistics
 
+if !isdir("./Assignment3/plots")
+    mkdir("./Assignment3/plots")
+end
+
+
+
 function euler_explicit(V0, nx::Int, nt::Int,t_end::Float64, a::Float64, b::Float64, λ = 1.0 , τ = 1.0 )
     dt = t_end/nt
     dx = (b-a)/nx
@@ -267,4 +273,6 @@ plot!(t,sol_implicit[:,50], ls =:dashdot,label="Euler implicit")
 # plot!(t,sol_explicit[:,50], label = "Euler explicit")
 plot!(t,sol_analytical[:,50], ls=:dash, label = "Analytical")
 savefig(d2, "cable_eq_first_point.png")
+d3 = heatmap(x,t,sol_crank, xlabel="x", ylabel="t", title="Crank-Nicolson Solution")
+savefig(d3, "cable_eq_surface.png")
 
