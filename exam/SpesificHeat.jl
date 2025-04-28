@@ -19,19 +19,19 @@ end
 
 
 "Calculates the energy difference when flipping a spin at (i, j) in the system."
-function calc_dE(system, i, j)
+function calc_dE(system, i, j, H)
     x_dim, y_dim = size(system)  
     # Calculate the energy difference when flipping the spin at (i, j)
     i_up = mod1(i-1, x_dim)
     i_down = mod1(i+1, x_dim)
     j_left = mod1(j-1, y_dim)
     j_right = mod1(j+1, y_dim)
-    ΔE = 2 * system[i, j] * (system[i_up, j] + system[i_down, j] + system[i, j_left] + system[i, j_right])
+    ΔE = 2 * system[i, j] * (system[i_up, j] + system[i_down, j] + system[i, j_left] + system[i, j_right]) + 2* H *system[i,j]
     return ΔE
 end
 
 "Calculates the total energy of the system, by calculating the energy of each spin and its neighbors."
-function get_energy(system)
+function get_energy(system, H=0.0)
     # Calculate the total energy of the system
     x_dim, y_dim = size(system)  
     energy = 0.0
@@ -40,12 +40,12 @@ function get_energy(system)
             energy += -system[i, j] * (system[mod1(i-1, x_dim), j] + system[mod1(i+1, x_dim), j] + system[i, mod1(j-1, y_dim)] + system[i, mod1(j+1, y_dim)])
         end
     end
-    return energy / 2.0  # Each pair is counted twice
+    return energy / 2.0 - H*sum(system)  # Each pair is counted twice
 end
 
 
 "Performs the Mc sweep of the system, flipping spins with a probability determined by the energy difference and temperature."
-function sweep(system, num_sweeps, T, possible_indexes)
+function sweep(system, num_sweeps, T, possible_indexes, H = 0.0)
     # Perform a sweep of the system
     magnetization = zeros(num_sweeps)  # Initialize magnetization with the first value
     magnetization[1] = sum(system)  # Initial magnetization
@@ -58,7 +58,7 @@ function sweep(system, num_sweeps, T, possible_indexes)
         total_deltaE = 0.0
         for s in eachindex(possible_indexes)
             i, j = possible_indexes[s]
-            ΔE = calc_dE(system, i, j)
+            ΔE = calc_dE(system, i, j, H)
             r = rand()  # Generate a random number between 0 and 1
             if r < exp(-ΔE / T)'
                 total_deltaE += ΔE  # Accumulate the energy difference
@@ -218,6 +218,8 @@ function simulated_anehiling_with_constant_points(system, possible_indeces, cons
     return magnetization[end], energies[end]
 end
 
+
+# Todo make the initial condition the same for all iterations
 function simulated_anehiling_with_constant_points_all(iterations::Int=3)
     p_values = [0.01, 0.05, 0.1]  # Different probabilities for constant points
     x_dim, y_dim = 40, 40
@@ -236,4 +238,91 @@ function simulated_anehiling_with_constant_points_all(iterations::Int=3)
     end
 end
 
-simulated_anehiling_with_constant_points_all()
+
+
+#This marks the begining of the second part of the main assignment
+
+
+"Ploting fuction"
+function plot_with_h_field(T, H)
+    x_dim, y_dim = 40, 40
+    num_sweeps = 5_000
+    initial_system = generate_system(x_dim, y_dim)
+    possible_indeces = [(i, j) for i in 1:x_dim for j in 1:y_dim]
+    system_1, magnetization_1, _ = sweep(initial_system, num_sweeps, T, possible_indeces, H)
+    plot(magnetization_1, title="Magnetization vs. Sweep at ", xlabel="Sweep", ylabel="Magnetization", label="T=$T and H=$H")
+    plot!(legend=:bottomleft, title="Magnetization vs. Sweep at T=$T and H=$H")
+    savefig("./plots/Magnetization_vs_Sweep_$(T)_$H.png")
+    heatmap(system_1, c=:grays, title="Final System after $num_sweeps sweeps for T=$T and H=$H", xlabel="x", ylabel="y", aspect_ratio=1)
+    savefig("./plots/H_field_effect_at_$(T)_$H.png")
+end
+
+
+function calc_suseptibility(H, num_sweeps::Int=5_000)
+    temps = range(2.0, 2.6, length= 100)
+    x_dim, y_dim = 40, 40
+    initial_system = generate_system(x_dim, y_dim)
+    cut_off = 1000  # Cutoff for the first 1000 sweeps
+    susceptibility = zeros(length(temps))
+    magnetization_final = zeros(length(temps))  # Initialize magnetization with the first value
+    for (T, i) in ProgressBar(zip(temps, 1:length(temps)))
+        possible_indeces = [(i, j) for i in 1:x_dim for j in 1:y_dim]
+        _, magnetization, _ = sweep(initial_system, num_sweeps, T, possible_indeces, H)
+        susceptibility[i] = (mean(magnetization[cut_off:end].^2) - (mean(magnetization[cut_off:end]))^2)/T  # Calculate variance of energy
+        magnetization_final[i] = abs(magnetization[end])
+    end
+    return temps, magnetization_final, susceptibility
+end
+
+
+function plot_susceptibility_for_different_H()
+    Hs = [0.01, 0.05, 0.1]  # Different probabilities for constant points
+    temps, magnetization, susceptibility = calc_suseptibility(Hs[1])
+    p1 = plot(temps, susceptibility, title="Susceptibility vs. Temperature", xlabel="Temperature", ylabel="Susceptibility", label="H=$(Hs[1])")
+    p2 = plot(temps, magnetization, title="Magnetization vs. Temperature", xlabel="Temperature", ylabel="Magnetization", label="H=$(Hs[1])")
+    for H in Hs[2:end]
+        temps, magnetization, susceptibility = calc_suseptibility(H)
+        plot!(p1, temps, susceptibility, label="H=$H)")
+        plot!(p2, temps, magnetization, label="H=$H")
+    end
+    plot!(p1, legend=:topright)
+    plot!(p2, legend=:topright)
+    savefig(p1, "./plots/Susceptibility_vs_Temperature.png")
+    savefig(p2, "./plots/Magnetization_vs_Temperature.png")
+end
+
+function scaling_of_susceptibility(H)
+    temps, _, susceptibility = calc_suseptibility(H)
+    critical_temp = 2.3
+    gamma = 7/4
+    beta = 1/8
+    delta = 15
+    t_h = abs.((temps .- critical_temp)) ./ critical_temp
+    susceptibility_scaled = susceptibility .* t_h .^ gamma
+    h_scaled = H .* t_h .^ (-beta * delta)
+
+    # Split data into before and after critical_temp
+    before_critical = findall(t -> t < critical_temp, temps)
+    after_critical = findall(t -> t >= critical_temp, temps)
+
+    scatter((-1).*(h_scaled[before_critical]), (susceptibility_scaled[before_critical]),
+        label="Scaling of Susceptibility (T < Critical Temp)",
+        xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:blue)
+
+    scatter!((h_scaled[after_critical]), (susceptibility_scaled[after_critical]),
+        label="Scaling of Susceptibility (T >= Critical Temp)",
+        xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:red)
+    savefig("./plots/scaling_of_susceptibility_after_$H.png")
+
+    # Log-log plot
+    scatter(log.(h_scaled[before_critical]), log.(susceptibility_scaled[before_critical]),
+        label="Scaling of Susceptibility (T < Critical Temp)",
+        xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:blue)
+
+    scatter!(log.(h_scaled[after_critical]), log.(susceptibility_scaled[after_critical]),
+        label="Scaling of Susceptibility (T >= Critical Temp)",
+        xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:red)
+    savefig("./plots/loglog_scaling_of_susceptibility_$H.png")
+end
+
+scaling_of_susceptibility(0.1)
