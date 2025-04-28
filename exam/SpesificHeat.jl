@@ -5,6 +5,7 @@ using Statistics
 using StatsBase
 
 Random.seed!(1234242)  # Set a random seed for reproducibility
+mkpath("./plots")  # Create a directory for plots if it doesn't exist
 
 "Generates a random system of spins with dimensions x_dim and y_dim."
 function generate_system(x_dim, y_dim)
@@ -203,7 +204,7 @@ end
 
 
 "simulated_anehiling_with_constant_points function to run the sweep function with constant points."
-function simulated_anehiling_with_constant_points(system, possible_indeces, constant_points_indexes, iterations,p = 0.01)
+function simulated_anehiling_with_constant_points(system, possible_indeces, constant_points_indexes, iterations, p = 0.01)
     num_sweeps = 10
     temps = range(0.5, 3.0, length= 10000)
     temps = reverse(temps)  # Reverse the order of temperatures
@@ -219,6 +220,7 @@ function simulated_anehiling_with_constant_points(system, possible_indeces, cons
 end
 
 
+
 # Todo make the initial condition the same for all iterations
 function simulated_anehiling_with_constant_points_all(iterations::Int=3)
     p_values = [0.01, 0.05, 0.1]  # Different probabilities for constant points
@@ -230,9 +232,10 @@ function simulated_anehiling_with_constant_points_all(iterations::Int=3)
         num_constant_points = Int(round(p * x_dim * y_dim))  # Number of constant points
         constant_points_indexes = sample(1:length(possible_indeces), num_constant_points, replace=false)  # Randomly select constant points
         deleteat!(possible_indeces, sort(constant_points_indexes))  # Remove constant points from possible indexes
-        system = generate_system(x_dim, y_dim)
+        initial_system = generate_system(x_dim, y_dim)
         for i in 1:iterations
-            magnetization[i], energies[i] = simulated_anehiling_with_constant_points(system, possible_indeces, constant_points_indexes, i, p)
+            system_copy = copy(initial_system)  # Create a copy of the initial system for each iteration
+            magnetization[i], energies[i] = simulated_anehiling_with_constant_points(system_copy, possible_indeces, constant_points_indexes, i, p)
         end
         println("p = $p: Final Magnetization: ", magnetization, " Final Energy: ", energies)
     end
@@ -324,5 +327,3 @@ function scaling_of_susceptibility(H)
         xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:red)
     savefig("./plots/loglog_scaling_of_susceptibility_$H.png")
 end
-
-scaling_of_susceptibility(0.1)
