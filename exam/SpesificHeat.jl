@@ -213,9 +213,10 @@ function simulated_anehiling_with_constant_points(system, possible_indeces, cons
     for T in temps
         system, magnetization, energies = sweep(system, num_sweeps, T, possible_indeces)
     end
-    system[constant_points_indexes] .*= 2   # Set constant points to 2 
+    system[constant_points_indexes] .*= 2    
     heatmap(system, c=:grays, title = "$p for $iterations iterration", aspect_ratio=1)
-    savefig("./plots/SA_with_constant_points_$p _$iterations.png")
+    mkpath("./plots/SA$(p)")
+    savefig("./plots/SA$(p)/SA_with_constant_points_$p _$iterations.png")
     return magnetization[end], energies[end]
 end
 
@@ -235,7 +236,8 @@ function simulated_anehiling_with_constant_points_all(iterations::Int=3)
         initial_system = generate_system(x_dim, y_dim)
         for i in 1:iterations
             system_copy = copy(initial_system)  # Create a copy of the initial system for each iteration
-            magnetization[i], energies[i] = simulated_anehiling_with_constant_points(system_copy, possible_indeces, constant_points_indexes, i, p)
+            possible_indeces_copy = copy(possible_indeces)
+            magnetization[i], energies[i] = simulated_anehiling_with_constant_points(system_copy, possible_indeces_copy, constant_points_indexes, i, p)
         end
         println("p = $p: Final Magnetization: ", magnetization, " Final Energy: ", energies)
     end
