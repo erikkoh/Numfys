@@ -1,0 +1,239 @@
+using Plots
+using Random
+using ProgressBars
+using Statistics
+using StatsBase
+
+Random.seed!(1234242)  # Set a random seed for reproducibility
+
+"Generates a random system of spins with dimensions x_dim and y_dim."
+function generate_system(x_dim, y_dim)
+    system = zeros(x_dim, y_dim)
+    possible_spins = [-1, 1]
+    for i in eachindex(system)
+        system[i] = rand(possible_spins)
+    end
+    return system
+end
+
+
+
+"Calculates the energy difference when flipping a spin at (i, j) in the system."
+function calc_dE(system, i, j)
+    x_dim, y_dim = size(system)  
+    # Calculate the energy difference when flipping the spin at (i, j)
+    i_up = mod1(i-1, x_dim)
+    i_down = mod1(i+1, x_dim)
+    j_left = mod1(j-1, y_dim)
+    j_right = mod1(j+1, y_dim)
+    ΔE = 2 * system[i, j] * (system[i_up, j] + system[i_down, j] + system[i, j_left] + system[i, j_right])
+    return ΔE
+end
+
+"Calculates the total energy of the system, by calculating the energy of each spin and its neighbors."
+function get_energy(system)
+    # Calculate the total energy of the system
+    x_dim, y_dim = size(system)  
+    energy = 0.0
+    for i in 1:x_dim
+        for j in 1:y_dim
+            energy += -system[i, j] * (system[mod1(i-1, x_dim), j] + system[mod1(i+1, x_dim), j] + system[i, mod1(j-1, y_dim)] + system[i, mod1(j+1, y_dim)])
+        end
+    end
+    return energy / 2.0  # Each pair is counted twice
+end
+
+
+"Performs the Mc sweep of the system, flipping spins with a probability determined by the energy difference and temperature."
+function sweep(system, num_sweeps, T, possible_indexes)
+    # Perform a sweep of the system
+    magnetization = zeros(num_sweeps)  # Initialize magnetization with the first value
+    magnetization[1] = sum(system)  # Initial magnetization
+    energy = zeros(num_sweeps)  # Initialize energy with the first value
+    energy[1] = get_energy(system)  # Initial energy
+
+    #built in shuffle function in julia to ensure all spins are considered
+    possible_indexes = shuffle!(possible_indexes)
+    for m in 2:num_sweeps+1
+        total_deltaE = 0.0
+        for s in eachindex(possible_indexes)
+            i, j = possible_indexes[s]
+            ΔE = calc_dE(system, i, j)
+            r = rand()  # Generate a random number between 0 and 1
+            if r < exp(-ΔE / T)'
+                total_deltaE += ΔE  # Accumulate the energy difference
+                system[i, j] *= -1  # Flip the spin
+            end
+        end
+        energy[mod1(m,num_sweeps)] = energy[m-1] + total_deltaE  # Update energy after each sweep    
+        magnetization[mod1(m,num_sweeps)] = sum(system)  # Update magnetization after each sweep
+    end
+    return system, magnetization, energy
+end
+
+"Simple function to visualize the ising model"
+function plot_system(system, title="Ising Model")
+    # Plot the system using a heatmap
+    heatmap(system, c=:grays, title=title, xlabel="x", ylabel="y", aspect_ratio=1)
+end
+
+
+function ploting_magnetization()
+    temps = [2.1, 2.3, 2.5]
+    x_dim, y_dim = 40, 40
+    num_sweeps = 5_000
+    initial_system = generate_system(x_dim, y_dim)
+    possible_indeces = [(i, j) for i in 1:x_dim for j in 1:y_dim]
+
+    for ts in temps
+        system_1, magnetization_1, _ = sweep(generate_system(x_dim, y_dim), num_sweeps, ts, possible_indeces)
+        plot(magnetization_1, title="Magnetization vs. Sweep at ", xlabel="Sweep", ylabel="Magnetization", label="T=$ts")
+        plot!(legend=:topright, title="Magnetization vs. Sweep at T=$ts")
+        savefig("./plots/Magnetization_vs_Sweep_$ts.png")
+        plot_system(initial_system, "Initial System$ts")
+        savefig("./plots/Initial_System$ts.png")
+        plot_system(system_1, "Final System after $num_sweeps sweeps for T=$ts")
+        savefig("./plots/Final_System$ts.png")
+    end
+end
+
+
+"Runns sweep function for different temperatures and calculates the energy, magnetization, heat capacity, and critical temperature."
+function tempreture_trend_for_energy_and_mag(L::Int=40, num_sweeps::Int=5_000, possible_indexes = [])
+    temps = range(1.0, 3.0, length= 100)
+    x_dim, y_dim = L, L
+    initial_system = generate_system(x_dim, y_dim)
+    energy = zeros(length(temps))
+    magnetization = zeros(length(temps))
+    variance_dE = zeros(length(temps))
+    heat_capacity = zeros(length(temps))
+    cut_off = 1000  # Cutoff for the first 1000 sweeps
+    if possible_indexes == []  # If no possible indexes are provided, generate them
+        possible_indexes = [(i, j) for i in 1:x_dim for j in 1:y_dim]
+    end
+    for (i, ts) in ProgressBar(enumerate(temps))
+        system_1, magnetization_1, energies = sweep(initial_system, num_sweeps, ts, possible_indexes)
+        energy[i] = energies[end]  # Final energy after all sweeps
+        magnetization[i] = abs(magnetization_1[end])
+        variance_dE[i] = mean(energies[cut_off:end].^2) - (mean(energies[cut_off:end]))^2  # Calculate variance of energy
+        heat_capacity[i] = variance_dE[i] / (ts^2)  # Calculate heat capacity
+    end
+    argmax_heat_capacity = argmax(heat_capacity[2:end])  # Find the index of the maximum heat capacity
+    #find index of argmax_heat_capacity in temps
+    critical_temp = temps[argmax_heat_capacity]  # Find the temperature corresponding to the maximum heat capacity
+    return temps, energy, magnetization, heat_capacity, critical_temp
+end
+
+function ploting_heat_mag_and_energy()
+    temps, energy, magnetization, heat_capacity, critical_temp = tempreture_trend_for_energy_and_mag()
+    println("Critical Temperature: ", critical_temp)
+    plot(temps, energy, title="Energy vs. Temperature", xlabel="Temperature", ylabel="Energy", label="Energy")
+    plot!(legend=:topright, title="Energy vs. Temperature")
+    savefig("./plots/Energy_vs_Temperature.png")
+    plot(temps, magnetization, title="Magnetization vs. Temperature", xlabel="Temperature", ylabel="Magnetization", label="Magnetization")
+    plot!(legend=:topright, title="Magnetization vs. Temperature")
+    savefig("./plots/Magnetization_vs_Temperature.png")
+    plot(temps, heat_capacity, title="Heat Capacity vs. Temperature", xlabel="Temperature", ylabel="Heat Capacity", label="Heat Capacity")
+    plot!(legend=:topleft, title="Heat Capacity vs. Temperature")
+    savefig("./plots/Heat_Capacity_vs_Temperature.png")
+end
+
+"Runs the sweep function for different L values and calculates the critical temperature."
+function find_L_dependence_of_alpha(Ls::Vector{Int} = [10, 20, 40, 80], num_sweeps::Int=5_000)
+    critical_temp_L = zeros(length(Ls))
+    heat_capacity_L = Vector{Vector{Float64}}(undef, length(Ls))
+    for (i, L) in ProgressBar(enumerate(Ls))
+        _,_,_, heat_capacity, critical_temp = tempreture_trend_for_energy_and_mag(L, num_sweeps)
+        critical_temp_L[i] = critical_temp
+        heat_capacity_L[i] = heat_capacity
+    end
+    return critical_temp_L, heat_capacity_L
+end
+
+function plot_L_dependence_of_alpha(num_sweeps::Int=5_000)
+    Ls = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+    temps = range(1.0, 3.0, length= 100)
+    critical_temp_L, heat_capacity_L = find_L_dependence_of_alpha(Ls, num_sweeps)
+    plot(temps, heat_capacity_L[1], title="Heat Capacity vs. Temperature", xlabel="Temperature", ylabel="Heat Capacity", label="L=$(Ls[1])")
+    for i in 2:eachindex(Ls)
+        plot!(temps, heat_capacity_L[i], label="L=$(Ls[i])")
+    end
+    plot!(legend=:topright, title="Heat Capacity vs. Temperature")
+    savefig("./plots/Heat_Capacity_vs_Temperature_L.png")
+    plot(Ls, critical_temp_L, title="Critical Temperature vs. L", xlabel="L", ylabel="Critical Temperature", label="Critical Temperature")
+    plot!(legend=:bottomleft, title="Critical Temperature vs. L")
+    savefig("./plots/Critical_Temperature_vs_L.png")
+end
+
+"Modified sweep function to include constant points."
+function ising_model_with_constant_points(x_dim, y_dim, num_sweeps, p = 0.01)
+    num_constant_points = Int(round(p * x_dim * y_dim))  # Number of constant points
+    possible_indeces = [(i, j) for i in 1:x_dim for j in 1:y_dim]
+    constant_points_indexes = sample(1:length(possible_indeces), num_constant_points, replace=false)  # Randomly select constant points
+    deleteat!(possible_indeces, sort(constant_points_indexes))  # Remove constant points from possible indexes
+
+    (temps, energy, magnetization, heat_capacity, critical_temp) = tempreture_trend_for_energy_and_mag(40, num_sweeps,possible_indeces)
+    return temps, magnetization, energy, heat_capacity
+end
+
+function plot_different_constant_points()
+    x_dim, y_dim = 40, 40
+    num_sweeps = 5_000
+    p_values = [0.01, 0.05, 0.1]  # Different probabilities for constant points
+    (temps, energy, magnetization, heat_capacity, critical_temp) = tempreture_trend_for_energy_and_mag(x_dim, num_sweeps)
+
+    p1 = plot(temps, magnetization, title="Magnetization vs. Sweep with p", xlabel="Sweep", ylabel="Magnetization", label="p=0.0")
+    p2 = plot(temps, energy, title="Energy vs. Sweep with p", xlabel="Sweep", ylabel="Energy", label="p=0.0")
+    p3 = plot(heat_capacity, title="Heat Capacity vs. Sweep with p", xlabel="Sweep", ylabel="Heat Capacity", label="p=0.0")
+    for p in p_values
+        temps, magnetization, energy, heat_capacity = ising_model_with_constant_points(x_dim, y_dim, num_sweeps, p)
+        plot!(p1, temps, magnetization, label="p=$p")
+        plot!(p2, temps, energy, label="p=$p")
+        plot!(p3, heat_capacity, label="p=$p")
+        
+    end
+    plot!(p1, legend=:topright)
+    plot!(p2, legend=:topright)
+    plot!(p3, legend=:topright)
+
+    savefig(p1, "./plots/Magnetization_vs_Sweep_with_p.png")
+    savefig(p2, "./plots/Energy_vs_Sweep_with_p.png")
+    savefig(p3, "./plots/Heat_Capacity_vs_Sweep_with_p.png")
+end
+
+
+"simulated_anehiling_with_constant_points function to run the sweep function with constant points."
+function simulated_anehiling_with_constant_points(system, possible_indeces, constant_points_indexes, iterations,p = 0.01)
+    num_sweeps = 10
+    temps = range(0.5, 3.0, length= 10000)
+    temps = reverse(temps)  # Reverse the order of temperatures
+    energies = zeros()
+    magnetization = zeros(length(temps))  # Initialize magnetization with the first value
+    for T in temps
+        system, magnetization, energies = sweep(system, num_sweeps, T, possible_indeces)
+    end
+    system[constant_points_indexes] .*= 2   # Set constant points to 2 
+    heatmap(system, c=:grays, title = "$p for $iterations iterration", aspect_ratio=1)
+    savefig("./plots/SA_with_constant_points_$p _$iterations.png")
+    return magnetization[end], energies[end]
+end
+
+function simulated_anehiling_with_constant_points_all(iterations::Int=3)
+    p_values = [0.01, 0.05, 0.1]  # Different probabilities for constant points
+    x_dim, y_dim = 40, 40
+    for p in p_values
+        magnetization = zeros(iterations)
+        energies = zeros(iterations)
+        possible_indeces = [(i, j) for i in 1:x_dim for j in 1:y_dim]
+        num_constant_points = Int(round(p * x_dim * y_dim))  # Number of constant points
+        constant_points_indexes = sample(1:length(possible_indeces), num_constant_points, replace=false)  # Randomly select constant points
+        deleteat!(possible_indeces, sort(constant_points_indexes))  # Remove constant points from possible indexes
+        system = generate_system(x_dim, y_dim)
+        for i in 1:iterations
+            magnetization[i], energies[i] = simulated_anehiling_with_constant_points(system, possible_indeces, constant_points_indexes, i, p)
+        end
+        println("p = $p: Final Magnetization: ", magnetization, " Final Energy: ", energies)
+    end
+end
+
+simulated_anehiling_with_constant_points_all()
