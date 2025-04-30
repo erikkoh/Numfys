@@ -3,6 +3,8 @@ using Random
 using ProgressBars
 using Statistics
 using StatsBase
+using GLM                
+using DataFrames         
 
 Random.seed!(1234242)  # Set a random seed for reproducibility
 mkpath("./plots")  # Create a directory for plots if it doesn't exist
@@ -54,8 +56,8 @@ function sweep(system, num_sweeps, T, possible_indexes, H = 0.0)
     energy[1] = get_energy(system)  # Initial energy
 
     #built in shuffle function in julia to ensure all spins are considered
-    possible_indexes = shuffle!(possible_indexes)
     for m in 2:num_sweeps+1
+        possible_indexes = shuffle!(possible_indexes)
         total_deltaE = 0.0
         for s in eachindex(possible_indexes)
             i, j = possible_indexes[s]
@@ -73,9 +75,9 @@ function sweep(system, num_sweeps, T, possible_indexes, H = 0.0)
 end
 
 "Simple function to visualize the ising model"
-function plot_system(system, title="Ising Model")
+function plot_system(system, ttl)
     # Plot the system using a heatmap
-    heatmap(system, c=:grays, title=title, xlabel="x", ylabel="y", aspect_ratio=1)
+    heatmap(system, c=:grays, title = ttl, xlabel="x", ylabel="y", aspect_ratio=1)
 end
 
 
@@ -84,24 +86,25 @@ function ploting_magnetization()
     x_dim, y_dim = 40, 40
     num_sweeps = 5_000
     initial_system = generate_system(x_dim, y_dim)
+    p1 = plot_system(initial_system, "")
+    savefig(p1, "./plots/Initial_System.png")
     possible_indeces = [(i, j) for i in 1:x_dim for j in 1:y_dim]
-
-    for ts in temps
-        system_1, magnetization_1, _ = sweep(generate_system(x_dim, y_dim), num_sweeps, ts, possible_indeces)
-        plot(magnetization_1, title="Magnetization vs. Sweep at ", xlabel="Sweep", ylabel="Magnetization", label="T=$ts")
-        plot!(legend=:topright, title="Magnetization vs. Sweep at T=$ts")
-        savefig("./plots/Magnetization_vs_Sweep_$ts.png")
-        plot_system(initial_system, "Initial System$ts")
-        savefig("./plots/Initial_System$ts.png")
-        plot_system(system_1, "Final System after $num_sweeps sweeps for T=$ts")
-        savefig("./plots/Final_System$ts.png")
+    system_1, magnetization_1, _ = sweep(initial_system, num_sweeps, temps[1], possible_indeces)
+    p2 = plot(magnetization_1, xlabel="Sweep", ylabel="Magnetization", label="T=$(temps[1])")
+    p3 = plot_system(system_1,"T=$(temps[1])")
+    savefig(p3, "./plots/Final_System$(temps[1]).png")
+    for ts in temps[2:end]
+        system_1, magnetization_1, _ = sweep(initial_system, num_sweeps, ts, possible_indeces)
+        p3 = plot_system(system_1, "T=$ts")
+        savefig(p3, "./plots/Final_System$ts.png")
+        plot!(p2, magnetization_1,legend=:topright, label="T=$ts")
     end
+    savefig(p2,"./plots/Magnetization_vs_Sweep.png")
 end
 
 
-"Runns sweep function for different temperatures and calculates the energy, magnetization, heat capacity, and critical temperature."
-function tempreture_trend_for_energy_and_mag(L::Int=40, num_sweeps::Int=5_000, possible_indexes = [])
-    temps = range(1.0, 3.0, length= 100)
+"Runns sweep function for different temperatures and calculates the energy, magnetization, heat capacity, and critical temperature"
+function tempreture_trend_for_energy_and_mag(;L::Int=40, num_sweeps::Int=5_000, temps = range(1.0, 3.0, length= 100),possible_indexes = [])
     x_dim, y_dim = L, L
     initial_system = generate_system(x_dim, y_dim)
     energy = zeros(length(temps))
@@ -128,15 +131,18 @@ end
 function ploting_heat_mag_and_energy()
     temps, energy, magnetization, heat_capacity, critical_temp = tempreture_trend_for_energy_and_mag()
     println("Critical Temperature: ", critical_temp)
-    plot(temps, energy, title="Energy vs. Temperature", xlabel="Temperature", ylabel="Energy", label="Energy")
-    plot!(legend=:topright, title="Energy vs. Temperature")
+    scatter(temps, energy, xlabel="Temperature", ylabel="Energy", label="Energy")
+    scatter!(legend=:topright)
     savefig("./plots/Energy_vs_Temperature.png")
-    plot(temps, magnetization, title="Magnetization vs. Temperature", xlabel="Temperature", ylabel="Magnetization", label="Magnetization")
-    plot!(legend=:topright, title="Magnetization vs. Temperature")
+    scatter(temps, magnetization, xlabel="Temperature", ylabel="Magnetization", label="Magnetization")
+    scatter!(legend=:topright)
     savefig("./plots/Magnetization_vs_Temperature.png")
-    plot(temps, heat_capacity, title="Heat Capacity vs. Temperature", xlabel="Temperature", ylabel="Heat Capacity", label="Heat Capacity")
-    plot!(legend=:topleft, title="Heat Capacity vs. Temperature")
+    scatter(temps, heat_capacity, xlabel="Temperature", ylabel="Heat Capacity", label="Heat Capacity")
+    scatter!(legend=:topleft)
     savefig("./plots/Heat_Capacity_vs_Temperature.png")
+    temps, _, magnetization,_,_ = tempreture_trend_for_energy_and_mag(temps = range(0.0, 1.0, length=100))
+    scatter(temps, magnetization, xlabel="Temperature", ylabel="Magnetization", label="Magnetization")
+    savefig("./plots/Appendicmagnetisation")
 end
 
 "Runs the sweep function for different L values and calculates the critical temperature."
@@ -144,26 +150,28 @@ function find_L_dependence_of_alpha(Ls::Vector{Int} = [10, 20, 40, 80], num_swee
     critical_temp_L = zeros(length(Ls))
     heat_capacity_L = Vector{Vector{Float64}}(undef, length(Ls))
     for (i, L) in ProgressBar(enumerate(Ls))
-        _,_,_, heat_capacity, critical_temp = tempreture_trend_for_energy_and_mag(L, num_sweeps)
+        _,_,_, heat_capacity, critical_temp = tempreture_trend_for_energy_and_mag(L=L, num_sweeps=num_sweeps)
         critical_temp_L[i] = critical_temp
         heat_capacity_L[i] = heat_capacity
     end
     return critical_temp_L, heat_capacity_L
 end
 
-function plot_L_dependence_of_alpha(num_sweeps::Int=5_000)
+function plot_L_dependence_of_alpha(num_sweeps::Int=10_000)
+    temps = range(1.0, 3.0, length=100)
     Ls = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
-    temps = range(1.0, 3.0, length= 100)
     critical_temp_L, heat_capacity_L = find_L_dependence_of_alpha(Ls, num_sweeps)
-    plot(temps, heat_capacity_L[1], title="Heat Capacity vs. Temperature", xlabel="Temperature", ylabel="Heat Capacity", label="L=$(Ls[1])")
-    for i in 2:eachindex(Ls)
-        plot!(temps, heat_capacity_L[i], label="L=$(Ls[i])")
+    p1 = plot(temps[10:end], heat_capacity_L[1][10:end], xlabel="Temperature", ylabel="Heat Capacity", label="L=$(Ls[1])")
+    p2 = plot(Ls, critical_temp_L, label="T_c", xlabel="L", ylabel="Temprature")
+    for i in 2:length(Ls)
+        plot!(p1, temps[10:end], heat_capacity_L[i][10:end], label="L=$(Ls[i])")
     end
-    plot!(legend=:topright, title="Heat Capacity vs. Temperature")
-    savefig("./plots/Heat_Capacity_vs_Temperature_L.png")
-    plot(Ls, critical_temp_L, title="Critical Temperature vs. L", xlabel="L", ylabel="Critical Temperature", label="Critical Temperature")
-    plot!(legend=:bottomleft, title="Critical Temperature vs. L")
-    savefig("./plots/Critical_Temperature_vs_L.png")
+    plot!(p1, legend=:topright)
+    plot!(p2, legend=:topright)
+    scatter!(p3, legend=:topright)
+    savefig(p1, "./plots/Heat_Capacity_vs_Temperature_L.png")
+    savefig(p2, "./plots/critical_t_L.png")
+    savefig(p3, "./plots/Scaling_of_max_C")
 end
 
 "Modified sweep function to include constant points."
@@ -173,7 +181,7 @@ function ising_model_with_constant_points(x_dim, y_dim, num_sweeps, p = 0.01)
     constant_points_indexes = sample(1:length(possible_indeces), num_constant_points, replace=false)  # Randomly select constant points
     deleteat!(possible_indeces, sort(constant_points_indexes))  # Remove constant points from possible indexes
 
-    (temps, energy, magnetization, heat_capacity, critical_temp) = tempreture_trend_for_energy_and_mag(40, num_sweeps,possible_indeces)
+    (temps, energy, magnetization, heat_capacity, critical_temp) = tempreture_trend_for_energy_and_mag(L=40, num_sweeps=num_sweeps,possible_indexes = possible_indeces)
     return temps, magnetization, energy, heat_capacity
 end
 
@@ -181,40 +189,39 @@ function plot_different_constant_points()
     x_dim, y_dim = 40, 40
     num_sweeps = 5_000
     p_values = [0.01, 0.05, 0.1]  # Different probabilities for constant points
-    (temps, energy, magnetization, heat_capacity, critical_temp) = tempreture_trend_for_energy_and_mag(x_dim, num_sweeps)
+    (temps, energy, magnetization, heat_capacity, critical_temp) = tempreture_trend_for_energy_and_mag(L=x_dim, num_sweeps=num_sweeps)
 
-    p1 = plot(temps, magnetization, title="Magnetization vs. Sweep with p", xlabel="Sweep", ylabel="Magnetization", label="p=0.0")
-    p2 = plot(temps, energy, title="Energy vs. Sweep with p", xlabel="Sweep", ylabel="Energy", label="p=0.0")
-    p3 = plot(heat_capacity, title="Heat Capacity vs. Sweep with p", xlabel="Sweep", ylabel="Heat Capacity", label="p=0.0")
+    p1 = scatter(temps, magnetization, xlabel="Temprature", ylabel="Magnetization", label="p=0.0")
+    p2 = scatter(temps, energy, xlabel="Temprature", ylabel="Energy", label="p=0.0")
+    p3 = scatter(heat_capacity, xlabel="Temprature", ylabel="Heat Capacity", label="p=0.0")
     for p in p_values
         temps, magnetization, energy, heat_capacity = ising_model_with_constant_points(x_dim, y_dim, num_sweeps, p)
-        plot!(p1, temps, magnetization, label="p=$p")
-        plot!(p2, temps, energy, label="p=$p")
-        plot!(p3, heat_capacity, label="p=$p")
+        scatter!(p1, temps, magnetization, label="p=$p")
+        scatter!(p2, temps, energy, label="p=$p")
+        scatter!(p3, heat_capacity, label="p=$p")
         
     end
-    plot!(p1, legend=:topright)
-    plot!(p2, legend=:topright)
-    plot!(p3, legend=:topright)
+    scatter!(p1, legend=:topright)
+    scatter!(p2, legend=:topright)
+    scatter!(p3, legend=:topright)
 
-    savefig(p1, "./plots/Magnetization_vs_Sweep_with_p.png")
-    savefig(p2, "./plots/Energy_vs_Sweep_with_p.png")
-    savefig(p3, "./plots/Heat_Capacity_vs_Sweep_with_p.png")
+    savefig(p1, "./plots/Magnetization_vs_temprature_with_p.png")
+    savefig(p2, "./plots/Energy_vs_temprature_with_p.png")
+    savefig(p3, "./plots/Heat_Capacity_vs_temprature_with_p.png")
 end
 
 
 "simulated_anehiling_with_constant_points function to run the sweep function with constant points."
-function simulated_anehiling_with_constant_points(system, possible_indeces, constant_points_indexes, iterations, p = 0.01)
-    num_sweeps = 10
-    temps = range(0.5, 3.0, length= 10000)
+function simulated_anehiling_with_constant_points(system, possible_indeces, constant_points_indexes, iterations, num_sweeps, p = 0.01)
+    temps = range(0.5, 3.0, length= 1000)
     temps = reverse(temps)  # Reverse the order of temperatures
     energies = zeros()
     magnetization = zeros(length(temps))  # Initialize magnetization with the first value
     for T in temps
         system, magnetization, energies = sweep(system, num_sweeps, T, possible_indeces)
     end
-    system[constant_points_indexes] .*= 2    
-    heatmap(system, c=:grays, title = "$p for $iterations iterration", aspect_ratio=1)
+    system[constant_points_indexes] .*= 2
+    heatmap(system, c=:grays, title = "$p impureties and $iterations attempt", aspect_ratio=1)
     mkpath("./plots/SA$(p)")
     savefig("./plots/SA$(p)/SA_with_constant_points_$p _$iterations.png")
     return magnetization[end], energies[end]
@@ -227,17 +234,17 @@ function simulated_anehiling_with_constant_points_all(iterations::Int=3)
     p_values = [0.01, 0.05, 0.1]  # Different probabilities for constant points
     x_dim, y_dim = 40, 40
     for p in p_values
+        num_sweeps = 1
         magnetization = zeros(iterations)
         energies = zeros(iterations)
-        possible_indeces = [(i, j) for i in 1:x_dim for j in 1:y_dim]
         num_constant_points = Int(round(p * x_dim * y_dim))  # Number of constant points
-        constant_points_indexes = sample(1:length(possible_indeces), num_constant_points, replace=false)  # Randomly select constant points
-        deleteat!(possible_indeces, sort(constant_points_indexes))  # Remove constant points from possible indexes
-        initial_system = generate_system(x_dim, y_dim)
         for i in 1:iterations
-            system_copy = copy(initial_system)  # Create a copy of the initial system for each iteration
-            possible_indeces_copy = copy(possible_indeces)
-            magnetization[i], energies[i] = simulated_anehiling_with_constant_points(system_copy, possible_indeces_copy, constant_points_indexes, i, p)
+            possible_indeces = [(i, j) for i in 1:x_dim for j in 1:y_dim]
+            constant_points_indexes = sample(1:length(possible_indeces), num_constant_points, replace=false)  # Randomly select constant points
+            deleteat!(possible_indeces, sort(constant_points_indexes))  # Remove constant points from possible indexes
+            system_copy = generate_system(x_dim, y_dim)  # Create a copy of the initial system for each iteration
+            magnetization[i], energies[i] = simulated_anehiling_with_constant_points(system_copy, possible_indeces, constant_points_indexes, i,num_sweeps, p)
+            num_sweeps *= 10
         end
         println("p = $p: Final Magnetization: ", magnetization, " Final Energy: ", energies)
     end
@@ -263,8 +270,7 @@ function plot_with_h_field(T, H)
 end
 
 
-function calc_suseptibility(H, num_sweeps::Int=5_000)
-    temps = range(2.0, 2.6, length= 100)
+function calc_suseptibility(H, temps = range(1.0, 4.0, length=200),num_sweeps::Int=5_000)
     x_dim, y_dim = 40, 40
     initial_system = generate_system(x_dim, y_dim)
     cut_off = 1000  # Cutoff for the first 1000 sweeps
@@ -281,51 +287,65 @@ end
 
 
 function plot_susceptibility_for_different_H()
-    Hs = [0.01, 0.05, 0.1]  # Different probabilities for constant points
+    Hs = [0.01,0.02,0.03, 0.05]  # Different probabilities for constant points
     temps, magnetization, susceptibility = calc_suseptibility(Hs[1])
-    p1 = plot(temps, susceptibility, title="Susceptibility vs. Temperature", xlabel="Temperature", ylabel="Susceptibility", label="H=$(Hs[1])")
-    p2 = plot(temps, magnetization, title="Magnetization vs. Temperature", xlabel="Temperature", ylabel="Magnetization", label="H=$(Hs[1])")
-    for H in Hs[2:end]
+    p1 = scatter(temps, susceptibility, xlabel="Temperature", ylabel="Susceptibility", label="H=$(Hs[1])")
+    p2 = scatter(temps, magnetization, xlabel="Temperature", ylabel="Magnetization", label="H=$(Hs[1])")
+    for H in Hs[2:end-1]
         temps, magnetization, susceptibility = calc_suseptibility(H)
-        plot!(p1, temps, susceptibility, label="H=$H)")
-        plot!(p2, temps, magnetization, label="H=$H")
+        scatter!(p1, temps, susceptibility, label="H=$H)")
+        scatter!(p2, temps, magnetization, label="H=$H")
     end
-    plot!(p1, legend=:topright)
-    plot!(p2, legend=:topright)
+    temps, magnetization, susceptibility = calc_suseptibility(Hs[end])
+    scatter!(p1, temps, susceptibility, label="H=$(Hs[end])")
+    scatter!(p2, temps, magnetization, label="H=$(Hs[end])")
+    p3 = scatter(temps, magnetization, xlabel="Temprature", ylabel = "Magnetization", label="M", title="H=$(Hs[end])")
+    scatter!(p3, temps, magnetization*Hs[end], label="X*H")
+
+
+    scatter!(p1, legend=:topright)
+    scatter!(p2, legend=:topright)
+    scatter!(p3, legend=:topright)
     savefig(p1, "./plots/Susceptibility_vs_Temperature.png")
     savefig(p2, "./plots/Magnetization_vs_Temperature.png")
+    savefig(p3, "./plots/Linearmagnetic.png")
 end
 
-function scaling_of_susceptibility(H)
-    temps, _, susceptibility = calc_suseptibility(H)
+function scaling_of_susceptibility(Hs = [0.01, 0.02 , 0.03, 0.05])
     critical_temp = 2.3
     gamma = 7/4
     beta = 1/8
     delta = 15
-    t_h = abs.((temps .- critical_temp)) ./ critical_temp
-    susceptibility_scaled = susceptibility .* t_h .^ gamma
-    h_scaled = H .* t_h .^ (-beta * delta)
+    temps = range(2.0,2.6, length=100)
+    mkpath("./plots/Susceptibility")
+    for (i,H) in enumerate(Hs)
+        temps, _, susceptibility = calc_suseptibility(H, temps)
+        t_h = abs.((temps .- critical_temp)) ./ critical_temp
+        susceptibility_scaled = susceptibility .* t_h .^ gamma
+        h_scaled = H .* t_h .^ (-beta * delta)
+        
+        # Split data into before and after critical_temp
+        before_critical = findall(t -> t < critical_temp, temps)
+        after_critical = findall(t -> t > critical_temp, temps)
+        
+        scatter((-1).*(h_scaled[before_critical]), (susceptibility_scaled[before_critical]),
+            label="T < Critical Temp",
+            xlabel="H scaled", ylabel="Susceptibility scaled", color=:blue)
 
-    # Split data into before and after critical_temp
-    before_critical = findall(t -> t < critical_temp, temps)
-    after_critical = findall(t -> t >= critical_temp, temps)
+        scatter!((h_scaled[after_critical]), (susceptibility_scaled[after_critical]),
+            label="T > Critical Temp",
+            xlabel="H scaled", ylabel="Susceptibility scaled", color=:red, title="$H")
+            scatter!(legend=:topright)
+        savefig("./plots/Susceptibility/scaling_of_susceptibility_after$i.png")
 
-    scatter((-1).*(h_scaled[before_critical]), (susceptibility_scaled[before_critical]),
-        label="Scaling of Susceptibility (T < Critical Temp)",
-        xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:blue)
+        # Log-log plot
+        scatter(log.(h_scaled[before_critical]), log.(susceptibility_scaled[before_critical]),
+            label="T < Critical Temp",
+            xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:blue)
 
-    scatter!((h_scaled[after_critical]), (susceptibility_scaled[after_critical]),
-        label="Scaling of Susceptibility (T >= Critical Temp)",
-        xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:red)
-    savefig("./plots/scaling_of_susceptibility_after_$H.png")
-
-    # Log-log plot
-    scatter(log.(h_scaled[before_critical]), log.(susceptibility_scaled[before_critical]),
-        label="Scaling of Susceptibility (T < Critical Temp)",
-        xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:blue)
-
-    scatter!(log.(h_scaled[after_critical]), log.(susceptibility_scaled[after_critical]),
-        label="Scaling of Susceptibility (T >= Critical Temp)",
-        xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:red)
-    savefig("./plots/loglog_scaling_of_susceptibility_$H.png")
+        scatter!(log.(h_scaled[after_critical]), log.(susceptibility_scaled[after_critical]),
+            label="T > Critical Temp",
+            xlabel="log(H scaled)", ylabel="log(Susceptibility scaled)", color=:red, title="$H")
+        savefig("./plots/Susceptibility/loglog_scaling_of_susceptibility_$i.png")
+    end
 end
