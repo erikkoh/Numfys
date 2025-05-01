@@ -1,4 +1,4 @@
-include("SpesificHeat.jl")
+include("functions.jl")
 
 
 function main()
