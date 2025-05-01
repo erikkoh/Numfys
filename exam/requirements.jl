@@ -14,7 +14,7 @@ required_packages = [
 
 # Install missing packages
 for pkg in required_packages
-    if haskey(Pkg.dependencies(), pkg)!
+    if !haskey(Pkg.dependencies(), pkg)!
         println("Installing $pkg...")
         Pkg.add(pkg)
     else
