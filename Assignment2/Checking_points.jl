@@ -5,6 +5,7 @@ using ProgressBars
 
 
 
+mkpath("./HDF5_files")
 
 function does_intersect(p1::Vector{Float64}, p2::Vector{Float64}, point::Vector{Float64})
     if p1[2] > p2[2]
